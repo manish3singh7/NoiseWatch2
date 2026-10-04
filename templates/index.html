@@ -207,7 +207,12 @@
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button id="toggleGpsLockBtn" type="button" title="Toggle camera lock: Free-roam unlocked or follow GPS"
+                        class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5 active:scale-95">
+                        <i data-lucide="unlock" id="toggleLockIcon" class="w-3.5 h-3.5 text-indigo-400"></i>
+                        <span id="toggleLockLabel">Free-Roam (Unlocked)</span>
+                    </button>
                     <button id="locateUserBtn" type="button" title="Request exact high-precision GPS coordinates"
                         class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/30 transition-all inline-flex items-center gap-1.5 active:scale-95">
                         <i data-lucide="locate-fixed" class="w-3.5 h-3.5"></i>
@@ -223,14 +228,37 @@
                     <span>Acquiring exact GPS coordinates...</span>
                 </div>
                 <div class="text-[10px] text-slate-400 flex items-center gap-1.5 self-start sm:self-auto">
-                    <i data-lucide="mouse-pointer" class="w-3 h-3 text-indigo-400"></i>
-                    <span>Tip: Drag marker or click map to pinpoint your exact spot</span>
+                    <i data-lucide="compass" class="w-3 h-3 text-indigo-400"></i>
+                    <span>Map Unlocked: Pan and zoom anywhere to explore other areas</span>
                 </div>
             </div>
 
             <!-- Map Viewport with HUD Overlay -->
             <div class="relative w-full rounded-xl overflow-hidden border border-slate-800 shadow-inner">
-                <div id="userLocationMap" class="w-full h-64 sm:h-80 z-10 cursor-crosshair"></div>
+                <div id="userLocationMap" class="w-full h-72 sm:h-96 z-10 cursor-grab active:cursor-grabbing"></div>
+
+                <!-- Floating Zoom & Exploration Controls (Top-Right) -->
+                <div class="absolute top-3 right-3 z-[400] flex flex-col gap-1.5 bg-slate-950/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-800 shadow-2xl">
+                    <button id="mapZoomInBtn" type="button" title="Zoom in to neighborhood street view"
+                        class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center text-sm font-bold transition-all shadow hover:scale-105 active:scale-95">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                    </button>
+                    <button id="mapZoomOutBtn" type="button" title="Zoom out to see wider city and other areas"
+                        class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center text-sm font-bold transition-all shadow hover:scale-105 active:scale-95">
+                        <i data-lucide="minus" class="w-4 h-4"></i>
+                    </button>
+                    <div class="h-px bg-slate-800 my-0.5"></div>
+                    <button id="mapOverviewBtn" type="button" title="View wider city &amp; all regional areas"
+                        class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 flex items-center justify-center transition-all shadow hover:scale-105 active:scale-95">
+                        <i data-lucide="map" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+
+                <!-- Floating Free-Roam Indicator Badge (Top-Left) -->
+                <div id="mapModeIndicator" class="absolute top-3 left-3 z-[400] px-2.5 py-1 rounded-lg bg-slate-950/85 backdrop-blur-md border border-slate-800 text-[10px] sm:text-xs text-slate-300 shadow-xl flex items-center gap-1.5 font-medium">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                    <span id="mapModeText">Free-Roam (GPS Unlocked) — Explore &amp; Zoom</span>
+                </div>
 
                 <!-- Floating High-Precision Coordinates HUD -->
                 <div id="mapCoordinatesHUD" class="absolute bottom-2.5 left-2.5 z-[400] px-3 py-1.5 rounded-xl bg-slate-950/85 backdrop-blur-md border border-slate-800 text-[10px] sm:text-xs font-mono text-slate-300 shadow-xl flex items-center gap-2.5 flex-wrap">
@@ -240,10 +268,10 @@
                     </div>
                     <span class="text-slate-700">|</span>
                     <span id="hudAccuracyText" class="text-emerald-400 font-semibold">Accuracy: --</span>
-                    <button id="recenterMapBtn" type="button" title="Recenter map on your exact coordinates"
-                        class="ml-1 p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all flex items-center gap-1 text-[10px]">
+                    <button id="recenterMapBtn" type="button" title="Recenter map on your exact GPS coordinates"
+                        class="ml-1 px-2 py-0.5 rounded-md bg-emerald-600/80 hover:bg-emerald-600 text-white font-sans font-semibold transition-all flex items-center gap-1 text-[10px] active:scale-95 shadow">
                         <i data-lucide="focus" class="w-3 h-3"></i>
-                        <span class="hidden sm:inline">Recenter</span>
+                        <span>Recenter GPS</span>
                     </button>
                 </div>
             </div>
@@ -643,8 +671,16 @@
         let showThresholds = true;
         let showSensors = true;
 
-        // Initialize User Location Map
-        const userMap = L.map('userLocationMap').setView(fallbackCoords, 14);
+        // Initialize User Location Map with full zoom capabilities and unlocked exploration
+        const userMap = L.map('userLocationMap', {
+            zoomControl: false,
+            minZoom: 3,
+            maxZoom: 19,
+            scrollWheelZoom: true,
+            touchZoom: true,
+            doubleClickZoom: true,
+            dragging: true
+        }).setView(fallbackCoords, 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap'
@@ -660,6 +696,7 @@
         let userMarker = null;
         let userRadiusCircle = null;
         let currentPosition = null;
+        let isCameraLockedToGps = false; // UNLOCKED by default so user can freely pan to other areas and zoom in/out
 
         // Adaptive localized network generation when user's location changes significantly
         function adaptHotspotsToCenter(lat, lng, regionLabel = 'Local Grid') {
@@ -1277,7 +1314,7 @@
             return null;
         }
 
-        function applyUserPosition(lat, lng, accuracy = 45, label = 'You are here', source = 'gps') {
+        function applyUserPosition(lat, lng, accuracy = 45, label = 'You are here', source = 'gps', forceCameraFollow = false) {
             currentPosition = [lat, lng];
 
             // Adapt the regional sensor cluster network if the user's location is far from current grid center
@@ -1289,72 +1326,83 @@
                 if (badge) badge.textContent = `${areaLabel || 'Active'} Grid`;
             }
 
-            // High precision zoom level: zoom in close (16-17) when exact location is detected
-            const zoomLevel = (source === 'gps' || source === 'custom') ? 17 : 14;
-            userMap.setView([lat, lng], zoomLevel);
-            regionalMap.panTo([lat, lng]);
-
-            if (userMarker) userMap.removeLayer(userMarker);
-            if (userRadiusCircle) userMap.removeLayer(userRadiusCircle);
+            // Only move camera if camera lock is active OR forceCameraFollow is explicitly requested
+            if (forceCameraFollow || isCameraLockedToGps) {
+                const currentZoom = userMap.getZoom();
+                const targetZoom = (currentZoom && currentZoom > 3) ? currentZoom : 16;
+                userMap.setView([lat, lng], targetZoom, { animate: true });
+                regionalMap.panTo([lat, lng]);
+            }
 
             const isGps = source === 'gps';
             const isCustom = source === 'custom';
             const circleColor = isGps ? '#10b981' : (isCustom ? '#f59e0b' : '#3b82f6');
             const circleFill = isGps ? '#34d399' : (isCustom ? '#fbbf24' : '#60a5fa');
 
-            userRadiusCircle = L.circle([lat, lng], {
-                radius: Math.max(accuracy, 12),
-                color: circleColor,
-                fillColor: circleFill,
-                fillOpacity: isGps ? 0.22 : 0.16,
-                weight: 1.5
-            }).addTo(userMap);
+            // Move existing circle or create new
+            if (userRadiusCircle) {
+                userRadiusCircle.setLatLng([lat, lng]);
+                userRadiusCircle.setRadius(Math.max(accuracy, 12));
+                userRadiusCircle.setStyle({ color: circleColor, fillColor: circleFill });
+            } else {
+                userRadiusCircle = L.circle([lat, lng], {
+                    radius: Math.max(accuracy, 12),
+                    color: circleColor,
+                    fillColor: circleFill,
+                    fillOpacity: isGps ? 0.22 : 0.16,
+                    weight: 1.5
+                }).addTo(userMap);
+            }
 
-            // High-precision custom pulsing draggable marker
-            const markerPulseColor = isGps ? 'bg-emerald-500/40' : (isCustom ? 'bg-amber-500/40' : 'bg-indigo-500/40');
-            const markerBgColor = isGps ? 'bg-emerald-500' : (isCustom ? 'bg-amber-500' : 'bg-indigo-600');
-            const markerHtml = `
-                <div class="relative flex items-center justify-center cursor-move group" title="Your exact location (Drag to fine-tune)">
-                    <span class="absolute w-8 h-8 rounded-full ${markerPulseColor} animate-ping pointer-events-none"></span>
-                    <span class="absolute w-6 h-6 rounded-full ${markerPulseColor} opacity-75"></span>
-                    <div class="w-4 h-4 rounded-full ${markerBgColor} border-2 border-white shadow-2xl flex items-center justify-center">
-                        <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+            // Move existing marker smoothly without resetting camera view
+            if (userMarker) {
+                userMarker.setLatLng([lat, lng]);
+            } else {
+                const markerPulseColor = isGps ? 'bg-emerald-500/40' : (isCustom ? 'bg-amber-500/40' : 'bg-indigo-500/40');
+                const markerBgColor = isGps ? 'bg-emerald-500' : (isCustom ? 'bg-amber-500' : 'bg-indigo-600');
+                const markerHtml = `
+                    <div class="relative flex items-center justify-center cursor-move group" title="Your exact location (Drag to fine-tune)">
+                        <span class="absolute w-8 h-8 rounded-full ${markerPulseColor} animate-ping pointer-events-none"></span>
+                        <span class="absolute w-6 h-6 rounded-full ${markerPulseColor} opacity-75"></span>
+                        <div class="w-4 h-4 rounded-full ${markerBgColor} border-2 border-white shadow-2xl flex items-center justify-center">
+                            <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
 
-            const userExactIcon = L.divIcon({
-                className: 'user-exact-marker',
-                html: markerHtml,
-                iconSize: [32, 32],
-                iconAnchor: [16, 16]
-            });
+                const userExactIcon = L.divIcon({
+                    className: 'user-exact-marker',
+                    html: markerHtml,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
 
-            userMarker = L.marker([lat, lng], {
-                icon: userExactIcon,
-                draggable: true
-            }).addTo(userMap).bindPopup(`
-                <div class="text-xs text-slate-800 font-sans min-w-[160px]">
-                    <div class="font-bold text-slate-900">${label}</div>
-                    <div class="text-[10px] text-slate-600 font-mono mt-0.5">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
-                    <div class="text-[9px] text-emerald-600 font-semibold mt-0.5">Accuracy: ±${Math.round(accuracy)}m</div>
-                    <div class="text-[9px] text-slate-400 mt-1 italic">Drag marker to pinpoint your exact doorstep</div>
-                </div>
-            `).openPopup();
+                userMarker = L.marker([lat, lng], {
+                    icon: userExactIcon,
+                    draggable: true
+                }).addTo(userMap).bindPopup(`
+                    <div class="text-xs text-slate-800 font-sans min-w-[160px]">
+                        <div class="font-bold text-slate-900">${label}</div>
+                        <div class="text-[10px] text-slate-600 font-mono mt-0.5">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+                        <div class="text-[9px] text-emerald-600 font-semibold mt-0.5">Accuracy: ±${Math.round(accuracy)}m</div>
+                        <div class="text-[9px] text-slate-400 mt-1 italic">Drag marker to pinpoint your exact doorstep</div>
+                    </div>
+                `).openPopup();
 
-            userMarker.on('dragend', (e) => {
-                const pos = e.target.getLatLng();
-                applyUserPosition(pos.lat, pos.lng, 8, 'Custom Exact Pinpoint', 'custom');
-                const statusEl = document.getElementById('locationStatus');
-                if (statusEl) {
-                    statusEl.innerHTML = `
-                        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                        <span class="text-amber-300 font-medium">Pinpointed Spot: <b>${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}</b></span>
-                        <span class="text-[10px] text-slate-400">(Adjusted exact location)</span>
-                    `;
-                }
-                showToast(`Location adjusted to ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`, 'info');
-            });
+                userMarker.on('dragend', (e) => {
+                    const pos = e.target.getLatLng();
+                    applyUserPosition(pos.lat, pos.lng, 8, 'Custom Exact Pinpoint', 'custom', false);
+                    const statusEl = document.getElementById('locationStatus');
+                    if (statusEl) {
+                        statusEl.innerHTML = `
+                            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                            <span class="text-amber-300 font-medium">Pinpointed Spot: <b>${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}</b></span>
+                            <span class="text-[10px] text-slate-400">(Adjusted exact location)</span>
+                        `;
+                    }
+                    showToast(`Location adjusted to ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`, 'info');
+                });
+            }
 
             // Update floating HUD in map corner
             const hudCoords = document.getElementById('hudCoordsText');
@@ -1468,16 +1516,21 @@
                 }
             }
 
-            function handleGpsSuccess(position, modeName = 'Exact GPS') {
+            function handleGpsSuccess(position, modeName = 'Exact GPS', initialCenter = true) {
                 const { latitude, longitude, accuracy } = position.coords;
-                applyUserPosition(latitude, longitude, accuracy, `${modeName} Locked`, 'gps');
-
-                if (userMap) {
-                    userMap.flyTo([latitude, longitude], 17, { duration: 1.0 });
+                
+                // Only center/fly the camera on the very first lock or when user explicitly requested location
+                if (initialCenter && (interactive || !currentPosition)) {
+                    const currentZoom = userMap.getZoom();
+                    const targetZoom = (currentZoom && currentZoom > 12) ? currentZoom : 16;
+                    userMap.flyTo([latitude, longitude], targetZoom, { duration: 0.8 });
                 }
 
+                // Update coordinates without force-re-centering camera
+                applyUserPosition(latitude, longitude, accuracy, `${modeName} Locked`, 'gps', false);
+
                 if (locateBtnLabel) {
-                    locateBtnLabel.textContent = 'Exact GPS Locked (Live)';
+                    locateBtnLabel.textContent = 'Track My Exact Location';
                 }
 
                 if (gpsLiveBadge) {
@@ -1523,7 +1576,7 @@
                 });
 
                 if (interactive) {
-                    showToast(`Exact GPS locked with ±${Math.round(accuracy)}m precision!`, 'success');
+                    showToast(`Exact GPS locked with ±${Math.round(accuracy)}m precision! Free-roam is enabled.`, 'success');
                 }
 
                 // Start continuous live GPS satellite tracking
@@ -1537,7 +1590,8 @@
                 trackingWatchId = navigator.geolocation.watchPosition(
                     (watchPos) => {
                         const { latitude: wLat, longitude: wLng, accuracy: wAcc } = watchPos.coords;
-                        applyUserPosition(wLat, wLng, wAcc, 'Exact GPS Live', 'gps');
+                        // Never force-recenter camera during background continuous ticks so user can freely pan and zoom
+                        applyUserPosition(wLat, wLng, wAcc, 'Exact GPS Live', 'gps', false);
                         const hudCoords = document.getElementById('hudCoordsText');
                         const hudAcc = document.getElementById('hudAccuracyText');
                         if (hudCoords) hudCoords.textContent = `${wLat.toFixed(6)}, ${wLng.toFixed(6)}`;
@@ -1557,7 +1611,7 @@
             // Stage 1: Request High-Accuracy Satellite GPS
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
-                    handleGpsSuccess(pos, 'Satellite GPS');
+                    handleGpsSuccess(pos, 'Satellite GPS', interactive);
                 },
                 (err) => {
                     console.warn('[NoiseWatch GPS Stage 1 Notice]', err.code, err.message);
@@ -1576,7 +1630,7 @@
 
                     navigator.geolocation.getCurrentPosition(
                         (stage2Pos) => {
-                            handleGpsSuccess(stage2Pos, 'Device Sensors');
+                            handleGpsSuccess(stage2Pos, 'Device Sensors', interactive);
                         },
                         (stage2Err) => {
                             console.warn('[NoiseWatch GPS Stage 2 Notice]', stage2Err.code, stage2Err.message);
@@ -1592,7 +1646,7 @@
                                     `;
                                 }
                                 if (interactive) {
-                                    showToast('Unable to lock GPS satellites. You can click on the map to set your exact location.', 'warning');
+                                    showToast('Unable to lock GPS satellites. You can pan or click on the map to set your location.', 'warning');
                                 }
                             }
                         },
@@ -1603,10 +1657,47 @@
             );
         }
 
+        // Camera Lock and Exploration State Management
+        function setCameraLock(locked) {
+            isCameraLockedToGps = locked;
+            const toggleIcon = document.getElementById('toggleLockIcon');
+            const toggleLabel = document.getElementById('toggleLockLabel');
+            const toggleBtn = document.getElementById('toggleGpsLockBtn');
+            const modeText = document.getElementById('mapModeText');
+
+            if (locked) {
+                if (toggleLabel) toggleLabel.textContent = 'Camera Locked (Following)';
+                if (toggleIcon) toggleIcon.setAttribute('data-lucide', 'lock');
+                if (toggleBtn) {
+                    toggleBtn.className = "px-3 py-1.5 rounded-lg bg-emerald-950/70 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-500/40 text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5 active:scale-95";
+                }
+                if (modeText) modeText.textContent = 'Camera Locked to GPS (Auto-Following)';
+                if (currentPosition) {
+                    userMap.panTo(currentPosition, { animate: true, duration: 0.6 });
+                }
+            } else {
+                if (toggleLabel) toggleLabel.textContent = 'Free-Roam (Unlocked)';
+                if (toggleIcon) toggleIcon.setAttribute('data-lucide', 'unlock');
+                if (toggleBtn) {
+                    toggleBtn.className = "px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1.5 active:scale-95";
+                }
+                if (modeText) modeText.textContent = 'Free-Roam (GPS Unlocked) — Explore & Zoom';
+            }
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // When user drags or zooms, unlock camera automatically
+        userMap.on('dragstart', () => {
+            if (isCameraLockedToGps) setCameraLock(false);
+        });
+        userMap.on('zoomstart', () => {
+            if (isCameraLockedToGps) setCameraLock(false);
+        });
+
         // Allow user to click anywhere on userMap or regionalMap to place their location pin
         function handleMapClick(e) {
             const { lat, lng } = e.latlng;
-            applyUserPosition(lat, lng, 10, 'Custom Exact Location', 'custom');
+            applyUserPosition(lat, lng, 10, 'Custom Exact Location', 'custom', false);
 
             const statusEl = document.getElementById('locationStatus');
             const badgeEl = document.getElementById('mapAreaBadge');
@@ -1624,18 +1715,37 @@
         userMap.on('click', handleMapClick);
         regionalMap.on('click', handleMapClick);
 
+        document.getElementById('toggleGpsLockBtn')?.addEventListener('click', () => {
+            setCameraLock(!isCameraLockedToGps);
+            if (isCameraLockedToGps) {
+                showToast('Camera locked: Map will follow your movement', 'info');
+            } else {
+                showToast('Free-Roam mode: Camera unlocked for exploration', 'info');
+            }
+        });
+
+        document.getElementById('mapZoomInBtn')?.addEventListener('click', () => {
+            userMap.zoomIn();
+        });
+
+        document.getElementById('mapZoomOutBtn')?.addEventListener('click', () => {
+            userMap.zoomOut();
+        });
+
+        document.getElementById('mapOverviewBtn')?.addEventListener('click', () => {
+            setCameraLock(false);
+            userMap.setView(currentGridCenter, 12, { animate: true });
+            showToast('Showing full regional overview. Pan or zoom anywhere.', 'info');
+        });
+
         document.getElementById('recenterMapBtn')?.addEventListener('click', () => {
             if (currentPosition) {
-                userMap.flyTo(currentPosition, 17, { duration: 0.8 });
-                showToast('Recentered on your exact position', 'info');
+                userMap.flyTo(currentPosition, 16, { duration: 0.8 });
+                showToast('Recentered on your exact GPS position', 'info');
             }
         });
 
         document.getElementById('randomTravelBtn')?.addEventListener('click', () => {
-            travelToRandomLocation();
-        });
-
-        document.getElementById('randomTravelMapBtn')?.addEventListener('click', () => {
             travelToRandomLocation();
         });
 
