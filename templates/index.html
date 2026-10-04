@@ -1416,103 +1416,190 @@
             const gpsLiveBadgeText = document.getElementById('gpsLiveBadgeText');
 
             if (!navigator.geolocation) {
-                fetchIpLocationFallback('Geolocation API unsupported by browser');
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                        <span class="text-red-300 font-medium">Geolocation not supported by browser.</span>
+                        <span class="text-[10px] text-slate-400">— Tap map to pin your exact location</span>
+                    `;
+                }
+                showToast('Geolocation is not supported by your browser.', 'error');
                 return;
             }
 
+            // If we have a saved exact GPS position in localStorage, immediately set the map to it
+            try {
+                const saved = localStorage.getItem('noisewatch_exact_gps');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && parsed.lat && parsed.lng) {
+                        applyUserPosition(parsed.lat, parsed.lng, parsed.accuracy || 15, 'Exact Location (Cached)', 'gps');
+                    }
+                }
+            } catch (e) {}
+
             if (locateBtnLabel) {
-                locateBtnLabel.textContent = 'Acquiring Exact GPS...';
+                locateBtnLabel.textContent = 'Locking Exact GPS...';
             }
 
-            statusEl.innerHTML = `
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                <span class="text-emerald-300">Contacting GPS satellites (High Accuracy)...</span>
-            `;
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span class="text-emerald-300 font-semibold">Contacting GPS satellites (High-Precision Lock)...</span>
+                `;
+            }
 
             if (trackingWatchId !== null) {
                 navigator.geolocation.clearWatch(trackingWatchId);
                 trackingWatchId = null;
             }
 
-            // Request High-Accuracy Satellite GPS
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude, longitude, accuracy } = position.coords;
-                    applyUserPosition(latitude, longitude, accuracy, 'Exact Live Location', 'gps');
-
-                    if (userMap) {
-                        userMap.flyTo([latitude, longitude], 17, { duration: 1.2 });
-                    }
-
-                    if (locateBtnLabel) {
-                        locateBtnLabel.textContent = 'Tracking Exact Location (Live)';
-                    }
-
-                    if (gpsLiveBadge) {
-                        gpsLiveBadge.classList.remove('hidden');
-                        if (gpsLiveBadgeText) {
-                            gpsLiveBadgeText.textContent = `EXACT GPS LOCKED (±${Math.round(accuracy)}m)`;
-                        }
-                    }
-
+            function handlePermissionDenied() {
+                if (locateBtnLabel) locateBtnLabel.textContent = 'Enable Location & Retry';
+                if (statusEl) {
                     statusEl.innerHTML = `
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span class="text-emerald-400 font-bold">Exact GPS Active (±${Math.round(accuracy)}m)</span>
-                        <span class="text-slate-300 font-mono text-[10px] hidden sm:inline">[${latitude.toFixed(6)}, ${longitude.toFixed(6)}]</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                        <span class="text-amber-300 font-bold">Location Permission Needed:</span>
+                        <span class="text-slate-300">Click the lock icon in your browser URL bar to allow location, or click the map to place your pin.</span>
                     `;
+                }
+                if (interactive) {
+                    showToast('Please grant location permission in your browser to lock your exact coordinates.', 'warning');
+                }
+            }
 
-                    badgeEl.textContent = `Tracking (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
+            function handleGpsSuccess(position, modeName = 'Exact GPS') {
+                const { latitude, longitude, accuracy } = position.coords;
+                applyUserPosition(latitude, longitude, accuracy, `${modeName} Locked`, 'gps');
+
+                if (userMap) {
+                    userMap.flyTo([latitude, longitude], 17, { duration: 1.0 });
+                }
+
+                if (locateBtnLabel) {
+                    locateBtnLabel.textContent = 'Exact GPS Locked (Live)';
+                }
+
+                if (gpsLiveBadge) {
+                    gpsLiveBadge.classList.remove('hidden');
+                    if (gpsLiveBadgeText) {
+                        gpsLiveBadgeText.textContent = `EXACT GPS LOCKED (±${Math.round(accuracy)}m)`;
+                    }
+                }
+
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span class="text-emerald-400 font-bold">Exact GPS Active (±${Math.round(accuracy)}m):</span>
+                        <span class="text-slate-200 font-mono text-[11px] font-semibold">${latitude.toFixed(6)}, ${longitude.toFixed(6)}</span>
+                    `;
+                }
+
+                if (badgeEl) {
+                    badgeEl.textContent = `GPS Locked (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`;
                     badgeEl.className = "text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+                }
 
-                    showToast(`Exact GPS location locked with ±${Math.round(accuracy)}m precision!`, 'success');
+                // Cache to localStorage
+                try {
+                    localStorage.setItem('noisewatch_exact_gps', JSON.stringify({
+                        lat: latitude,
+                        lng: longitude,
+                        accuracy: Math.round(accuracy),
+                        updated: Date.now()
+                    }));
+                } catch (e) {}
 
-                    // Reverse geocode locality for display
-                    reverseGeocodeAddress(latitude, longitude).then(locality => {
-                        if (locality) {
-                            statusEl.innerHTML = `
-                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                                <span class="text-emerald-400 font-bold">Exact Location: ${locality}</span>
-                                <span class="text-slate-400 text-[10px] font-mono">(±${Math.round(accuracy)}m)</span>
-                            `;
+                // Reverse geocode locality for display and form
+                reverseGeocodeAddress(latitude, longitude).then(locality => {
+                    if (locality && statusEl) {
+                        statusEl.innerHTML = `
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                            <span class="text-emerald-400 font-bold">Exact GPS:</span>
+                            <span class="text-slate-200 font-medium">${locality}</span>
+                            <span class="text-emerald-300 text-[10px] font-mono font-semibold">(±${Math.round(accuracy)}m)</span>
+                        `;
+                    }
+                });
+
+                if (interactive) {
+                    showToast(`Exact GPS locked with ±${Math.round(accuracy)}m precision!`, 'success');
+                }
+
+                // Start continuous live GPS satellite tracking
+                startContinuousGpsWatch();
+            }
+
+            function startContinuousGpsWatch() {
+                if (trackingWatchId !== null) {
+                    navigator.geolocation.clearWatch(trackingWatchId);
+                }
+                trackingWatchId = navigator.geolocation.watchPosition(
+                    (watchPos) => {
+                        const { latitude: wLat, longitude: wLng, accuracy: wAcc } = watchPos.coords;
+                        applyUserPosition(wLat, wLng, wAcc, 'Exact GPS Live', 'gps');
+                        const hudCoords = document.getElementById('hudCoordsText');
+                        const hudAcc = document.getElementById('hudAccuracyText');
+                        if (hudCoords) hudCoords.textContent = `${wLat.toFixed(6)}, ${wLng.toFixed(6)}`;
+                        if (hudAcc) {
+                            hudAcc.textContent = `±${Math.round(wAcc)}m (${wAcc <= 20 ? 'Satellite Lock' : 'High Accuracy'})`;
+                            hudAcc.className = 'text-emerald-400 font-bold font-mono';
                         }
-                    });
+                        if (gpsLiveBadgeText) {
+                            gpsLiveBadgeText.textContent = `EXACT GPS LOCKED (±${Math.round(wAcc)}m)`;
+                        }
+                    },
+                    (watchErr) => { console.warn('[GPS watch notice]', watchErr); },
+                    { enableHighAccuracy: true, timeout: 30000, maximumAge: 5000 }
+                );
+            }
 
-                    // Start continuous watcher for live movement refinement
-                    trackingWatchId = navigator.geolocation.watchPosition(
-                        (watchPos) => {
-                            const { latitude: wLat, longitude: wLng, accuracy: wAcc } = watchPos.coords;
-                            applyUserPosition(wLat, wLng, wAcc, 'Exact Live Location', 'gps');
-                            const hudCoords = document.getElementById('hudCoordsText');
-                            const hudAcc = document.getElementById('hudAccuracyText');
-                            if (hudCoords) hudCoords.textContent = `${wLat.toFixed(6)}, ${wLng.toFixed(6)}`;
-                            if (hudAcc) hudAcc.textContent = `±${Math.round(wAcc)}m (High Accuracy)`;
-                        },
-                        (watchErr) => { console.warn('GPS continuous watch notice', watchErr); },
-                        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-                    );
+            // Stage 1: Request High-Accuracy Satellite GPS
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    handleGpsSuccess(pos, 'Satellite GPS');
                 },
                 (err) => {
-                    let reason = 'GPS unavailable';
+                    console.warn('[NoiseWatch GPS Stage 1 Notice]', err.code, err.message);
                     if (err.code === 1) { // PERMISSION_DENIED
-                        reason = 'Browser permission denied';
-                    } else if (err.code === 2) { // POSITION_UNAVAILABLE
-                        reason = 'GPS signal unavailable';
-                    } else if (err.code === 3) { // TIMEOUT
-                        reason = 'GPS timed out';
-                    }
-                    console.warn('[NoiseWatch Geolocation Notice]', err.code, err.message);
-
-                    if (locateBtnLabel) {
-                        locateBtnLabel.textContent = 'Retry GPS Fix';
+                        handlePermissionDenied();
+                        return;
                     }
 
-                    if (err.code === 1) {
-                        showToast('Please grant location access in your browser or click on the map to set your exact spot.', 'warning');
+                    // Stage 2: Graceful fallback to device sensor/network geolocation (does NOT jump to IP)
+                    if (statusEl) {
+                        statusEl.innerHTML = `
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span class="text-emerald-300 font-medium">Refining exact coordinates from device sensors...</span>
+                        `;
                     }
 
-                    fetchIpLocationFallback(reason);
+                    navigator.geolocation.getCurrentPosition(
+                        (stage2Pos) => {
+                            handleGpsSuccess(stage2Pos, 'Device Sensors');
+                        },
+                        (stage2Err) => {
+                            console.warn('[NoiseWatch GPS Stage 2 Notice]', stage2Err.code, stage2Err.message);
+                            if (stage2Err.code === 1) {
+                                handlePermissionDenied();
+                            } else {
+                                if (locateBtnLabel) locateBtnLabel.textContent = 'Retry GPS Lock';
+                                if (statusEl) {
+                                    statusEl.innerHTML = `
+                                        <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                                        <span class="text-amber-300 font-medium">GPS fix waiting for signal.</span>
+                                        <span class="text-slate-400 text-[10px]">— Click or drag map marker to pinpoint your exact spot</span>
+                                    `;
+                                }
+                                if (interactive) {
+                                    showToast('Unable to lock GPS satellites. You can click on the map to set your exact location.', 'warning');
+                                }
+                            }
+                        },
+                        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+                    );
                 },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
             );
         }
 
