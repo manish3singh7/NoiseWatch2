@@ -228,6 +228,11 @@ function requireAdmin(req: Request, res: Response, next: NextFunction) {
 
 // ----------------- ROUTES -----------------
 
+// Healthcheck endpoint for Railway and monitoring
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({ status: 'healthy', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
 // Citizen Dashboard
 app.get('/', (_req: Request, res: Response) => {
   res.render('index', { about: aboutContent });
