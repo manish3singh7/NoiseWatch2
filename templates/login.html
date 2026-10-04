@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoiseWatch - Authority Authentication</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 antialiased font-sans relative">
+
+    <div class="w-full max-w-md bg-slate-900/80 border border-slate-800 p-6 sm:p-8 rounded-2xl shadow-2xl backdrop-blur-xl z-10">
+
+        <div class="text-center mb-6">
+            <div
+                class="w-12 h-12 rounded-xl bg-indigo-600 mx-auto flex items-center justify-center text-white mb-3 shadow-lg shadow-indigo-600/30">
+                <i data-lucide="shield-check" class="w-6 h-6"></i>
+            </div>
+            <h2 class="text-xl font-bold text-white tracking-tight">Authority Access Only</h2>
+            <p class="text-xs text-slate-400 mt-1">Authorized municipal portal for verified administrators</p>
+        </div>
+
+        <div id="errorAlert" class="<% if (!locals.error) { %>hidden<% } %> mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold text-center">
+            <%= locals.error || '' %>
+        </div>
+
+        <form id="loginForm" method="POST" action="/login" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Username or Admin Email</label>
+                <input id="usernameInput" type="text" name="username" required autocomplete="username"
+                    placeholder="Enter your username or email"
+                    class="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors" />
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-xs font-semibold text-slate-300">Password</label>
+                    <button type="button" id="openForgotModalBtn"
+                        class="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 transition-colors inline-flex items-center gap-1">
+                        <i data-lucide="key" class="w-3 h-3"></i>
+                        <span>Forgot Password?</span>
+                    </button>
+                </div>
+                <input id="passwordInput" type="password" name="password" required autocomplete="current-password"
+                    placeholder="Enter your password"
+                    class="w-full px-3 py-2 text-sm bg-slate-950 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors" />
+            </div>
+
+            <button type="submit" id="submitBtn"
+                class="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2">
+                <i data-lucide="log-in" class="w-4 h-4"></i>
+                <span>Sign In to Admin Portal</span>
+            </button>
+        </form>
+
+        <div class="mt-6 flex items-center justify-between text-xs text-slate-500">
+            <a href="/" class="hover:text-slate-300 transition-colors flex items-center gap-1">
+                <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+                <span>Citizen Dashboard</span>
+            </a>
+            <span class="text-[10px] text-slate-600">Restricted Access</span>
+        </div>
+
+    </div>
+
+    <!-- OWNER ACCOUNT RECOVERY MODAL -->
+    <div id="forgotPasswordModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            
+            <!-- Modal Header -->
+            <div class="flex items-start justify-between pb-3 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="lock" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-white tracking-tight">Administrator Account Recovery</h3>
+                        <p class="text-xs text-slate-400">Exclusive recovery for the verified portal administrator</p>
+                    </div>
+                </div>
+                <button type="button" id="closeForgotModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Email Verification Section -->
+            <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                        <i data-lucide="mail-check" class="w-3.5 h-3.5 text-indigo-400"></i>
+                        Verify Registered Administrator Email
+                    </label>
+                    <span class="text-[10px] text-slate-500 font-mono">Owner Verification</span>
+                </div>
+                <p class="text-[11px] text-slate-400 leading-relaxed">
+                    For security, emergency PINs and recovery options are strictly restricted to your registered administrator email address.
+                </p>
+                <div class="flex gap-2">
+                    <input id="recoveryEmailInput" type="email" placeholder="Enter your registered email address"
+                        class="flex-1 px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+                    <button type="button" id="sendRecoveryEmailBtn"
+                        class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition-all flex items-center gap-1.5 flex-shrink-0">
+                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                        <span>Verify & Send</span>
+                    </button>
+                </div>
+
+                <!-- Recovery Result Box -->
+                <div id="recoveryResultBox" class="hidden mt-3 p-3 rounded-lg border text-xs space-y-2.5">
+                    <div id="recoveryMessage" class="font-medium text-emerald-400 flex items-center gap-1.5"></div>
+                    
+                    <div class="flex items-center justify-between p-2 rounded bg-slate-900/90 border border-slate-800 font-mono text-[11px]">
+                        <span class="text-slate-400">Emergency One-Time Access PIN:</span>
+                        <span id="displayPin" class="text-amber-300 font-bold tracking-wider text-xs">--</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <button type="button" id="applyPinBtn"
+                            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-1.5 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md">
+                            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                            <span>Login With PIN</span>
+                        </button>
+                        <button type="button" id="toggleChangePasswordBtn"
+                            class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-1.5 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 border border-slate-700">
+                            <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                            <span>Set New Password</span>
+                        </button>
+                    </div>
+
+                    <!-- Change Password Form -->
+                    <div id="changePasswordSection" class="hidden pt-2 border-t border-slate-800 space-y-2">
+                        <label class="block text-[11px] font-semibold text-slate-300">Choose a New Master Password</label>
+                        <div class="flex gap-2">
+                            <input id="newPasswordInput" type="password" placeholder="At least 6 characters"
+                                class="flex-1 px-3 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-indigo-500" />
+                            <button type="button" id="saveNewPasswordBtn"
+                                class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors flex-shrink-0">
+                                Save Password
+                            </button>
+                        </div>
+                        <div id="changePasswordMsg" class="hidden text-[11px] font-medium mt-1"></div>
+                    </div>
+                </div>
+
+                <!-- Error Result Box -->
+                <div id="recoveryErrorBox" class="hidden mt-3 p-3 rounded-lg border bg-rose-950/40 border-rose-500/30 text-rose-300 text-xs">
+                    <div class="flex items-start gap-2">
+                        <i data-lucide="shield-alert" class="w-4 h-4 text-rose-400 mt-0.5 flex-shrink-0"></i>
+                        <span id="recoveryErrorMsg">Access denied: Only the verified owner can request credentials.</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="pt-2 border-t border-slate-800 flex justify-end">
+                <button type="button" id="cancelModalBtn"
+                    class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors">
+                    Close
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const form = document.getElementById('loginForm');
+        const usernameInput = document.getElementById('usernameInput');
+        const passwordInput = document.getElementById('passwordInput');
+        const errorAlert = document.getElementById('errorAlert');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // Modal Elements
+        const modal = document.getElementById('forgotPasswordModal');
+        const openForgotModalBtn = document.getElementById('openForgotModalBtn');
+        const closeForgotModalBtn = document.getElementById('closeForgotModalBtn');
+        const cancelModalBtn = document.getElementById('cancelModalBtn');
+        const recoveryEmailInput = document.getElementById('recoveryEmailInput');
+        const sendRecoveryEmailBtn = document.getElementById('sendRecoveryEmailBtn');
+        const recoveryResultBox = document.getElementById('recoveryResultBox');
+        const recoveryErrorBox = document.getElementById('recoveryErrorBox');
+        const recoveryErrorMsg = document.getElementById('recoveryErrorMsg');
+        const recoveryMessage = document.getElementById('recoveryMessage');
+        const displayPin = document.getElementById('displayPin');
+        const applyPinBtn = document.getElementById('applyPinBtn');
+        const toggleChangePasswordBtn = document.getElementById('toggleChangePasswordBtn');
+        const changePasswordSection = document.getElementById('changePasswordSection');
+        const newPasswordInput = document.getElementById('newPasswordInput');
+        const saveNewPasswordBtn = document.getElementById('saveNewPasswordBtn');
+        const changePasswordMsg = document.getElementById('changePasswordMsg');
+
+        let latestGeneratedPin = '';
+
+        function openModal() {
+            modal.classList.remove('hidden');
+            recoveryResultBox.classList.add('hidden');
+            recoveryErrorBox.classList.add('hidden');
+            changePasswordSection.classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+        }
+
+        openForgotModalBtn.addEventListener('click', openModal);
+        closeForgotModalBtn.addEventListener('click', closeModal);
+        cancelModalBtn.addEventListener('click', closeModal);
+
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        // Close on Escape key
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        // Request Emergency Recovery PIN
+        sendRecoveryEmailBtn.addEventListener('click', async () => {
+            const email = recoveryEmailInput.value.trim();
+            if (!email) {
+                recoveryErrorMsg.textContent = 'Please enter your registered administrator email address.';
+                recoveryErrorBox.classList.remove('hidden');
+                recoveryResultBox.classList.add('hidden');
+                return;
+            }
+
+            sendRecoveryEmailBtn.disabled = true;
+            sendRecoveryEmailBtn.innerHTML = `<span>Verifying...</span>`;
+            recoveryResultBox.classList.add('hidden');
+            recoveryErrorBox.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/admin/forgot-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await res.json();
+
+                if (res.ok && data.success) {
+                    latestGeneratedPin = data.temporaryPin;
+                    displayPin.textContent = data.temporaryPin;
+                    recoveryMessage.innerHTML = `
+                        <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+                        <span>Identity verified. Emergency PIN dispatched for <b class="text-white">${escapeHtml(data.email)}</b></span>
+                    `;
+                    recoveryResultBox.className = "mt-3 p-3 rounded-lg border bg-emerald-950/40 border-emerald-500/30 text-xs space-y-2.5";
+                    recoveryResultBox.classList.remove('hidden');
+                    lucide.createIcons();
+                } else {
+                    recoveryErrorMsg.textContent = data.error || 'Access denied: Recovery is restricted exclusively to the account owner.';
+                    recoveryErrorBox.classList.remove('hidden');
+                }
+            } catch (err) {
+                recoveryErrorMsg.textContent = 'Network error verifying owner credentials.';
+                recoveryErrorBox.classList.remove('hidden');
+            } finally {
+                sendRecoveryEmailBtn.disabled = false;
+                sendRecoveryEmailBtn.innerHTML = `<i data-lucide="send" class="w-3.5 h-3.5"></i><span>Verify & Send</span>`;
+                lucide.createIcons();
+            }
+        });
+
+        // Toggle Set New Password Form
+        toggleChangePasswordBtn.addEventListener('click', () => {
+            changePasswordSection.classList.toggle('hidden');
+            if (!changePasswordSection.classList.contains('hidden')) {
+                newPasswordInput.focus();
+            }
+        });
+
+        // Save New Master Password
+        saveNewPasswordBtn.addEventListener('click', async () => {
+            const newPassword = newPasswordInput.value.trim();
+            if (newPassword.length < 6) {
+                changePasswordMsg.textContent = 'Password must be at least 6 characters.';
+                changePasswordMsg.className = 'text-[11px] text-rose-400 font-medium mt-1';
+                changePasswordMsg.classList.remove('hidden');
+                return;
+            }
+
+            saveNewPasswordBtn.disabled = true;
+            saveNewPasswordBtn.textContent = 'Saving...';
+
+            try {
+                const res = await fetch('/api/admin/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        currentPasswordOrPin: latestGeneratedPin,
+                        newPassword: newPassword
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    changePasswordMsg.textContent = 'Password updated successfully! Redirecting...';
+                    changePasswordMsg.className = 'text-[11px] text-emerald-400 font-medium mt-1';
+                    changePasswordMsg.classList.remove('hidden');
+
+                    usernameInput.value = recoveryEmailInput.value.trim() || 'admin';
+                    passwordInput.value = newPassword;
+
+                    setTimeout(() => {
+                        closeModal();
+                        form.dispatchEvent(new Event('submit', { cancelable: true }));
+                    }, 800);
+                } else {
+                    changePasswordMsg.textContent = data.error || 'Failed to update password.';
+                    changePasswordMsg.className = 'text-[11px] text-rose-400 font-medium mt-1';
+                    changePasswordMsg.classList.remove('hidden');
+                }
+            } catch (err) {
+                changePasswordMsg.textContent = 'Network error saving password.';
+                changePasswordMsg.className = 'text-[11px] text-rose-400 font-medium mt-1';
+                changePasswordMsg.classList.remove('hidden');
+            } finally {
+                saveNewPasswordBtn.disabled = false;
+                saveNewPasswordBtn.textContent = 'Save Password';
+            }
+        });
+
+        // Apply PIN and Auto-Login
+        applyPinBtn.addEventListener('click', () => {
+            if (latestGeneratedPin) {
+                usernameInput.value = recoveryEmailInput.value.trim() || 'admin';
+                passwordInput.value = latestGeneratedPin;
+                closeModal();
+                form.dispatchEvent(new Event('submit', { cancelable: true }));
+            }
+        });
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Form submission with token persistence
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value.trim();
+
+            errorAlert.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<span>Verifying credentials...</span>`;
+
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await res.json();
+
+                if (res.ok && data.success) {
+                    if (data.token) {
+                        localStorage.setItem('noisewatch_admin_token', data.token);
+                    }
+                    window.location.href = data.redirectUrl || `/admin?token=${data.token || ''}`;
+                } else {
+                    errorAlert.textContent = data.error || 'Invalid authority credentials. Access is restricted to the administrator.';
+                    errorAlert.classList.remove('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `<i data-lucide="log-in" class="w-4 h-4"></i><span>Sign In to Admin Portal</span>`;
+                    lucide.createIcons();
+                }
+            } catch (err) {
+                form.submit();
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,1775 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth h-full">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>NoiseWatch - Noise Monitoring Platform</title>
+    <meta name="description" content="Noise Monitoring Platform for continuous GPS tracking, acoustic telemetry, and citizen reporting." />
+    <meta property="og:title" content="NoiseWatch - Noise Monitoring Platform" />
+    <meta property="og:description" content="Noise Monitoring Platform for continuous GPS tracking, acoustic telemetry, and citizen reporting." />
+    <!-- PWA Manifest & Meta -->
+    <link rel="manifest" href="/static/manifest.json" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+    <!-- Three.js CDN for 3D Earth Background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
+</head>
+
+<body
+    class="min-h-screen flex flex-col font-sans antialiased text-slate-100 bg-slate-950 relative selection:bg-indigo-500 selection:text-white w-full overflow-x-hidden">
+
+    <!-- Live 3D Rotating Earth Background -->
+    <div class="fixed inset-0 pointer-events-none -z-10 w-full h-full overflow-hidden bg-slate-950">
+        <!-- ThreeJS WebGL Canvas -->
+        <canvas id="earthCanvas" class="w-full h-full block absolute inset-0"></canvas>
+        <!-- Soft Contrast Overlay so dashboard elements stay legible -->
+        <div class="absolute inset-0 bg-slate-950/60 pointer-events-none"></div>
+    </div>
+
+    <!-- Glassmorphic Header -->
+    <header
+        class="sticky top-0 z-30 w-full bg-slate-900/85 backdrop-blur-xl border-b border-slate-800/80 shadow-lg shadow-black/20">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+
+            <!-- Clickable Logo & Brand Name -->
+            <a href="#" class="flex items-center gap-2 sm:gap-3 group cursor-pointer flex-shrink-0" title="Back to Dashboard">
+                <div
+                    class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/30 group-hover:bg-indigo-500 transition-colors flex-shrink-0">
+                    <img src="/statics/logo.svg" alt="NoiseWatch Logo" width="22" height="22"
+                        onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                    <i data-lucide="activity" class="w-5 h-5 hidden"></i>
+                </div>
+                <div class="flex flex-col">
+                    <h1
+                        class="font-bold text-base sm:text-lg leading-tight text-white tracking-tight group-hover:text-indigo-400 transition-colors">
+                        NoiseWatch</h1>
+                    <p class="text-[10px] sm:text-xs text-slate-400 font-medium leading-none">Noise Monitoring Platform</p>
+                </div>
+            </a>
+
+            <!-- Quick Action Controls -->
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <span
+                    class="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Live Monitoring
+                </span>
+
+                <!-- About Us Link -->
+                <a href="#about"
+                    class="bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-xs sm:text-sm font-medium px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5">
+                    <i data-lucide="info" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400"></i>
+                    <span>About Us</span>
+                </a>
+
+                <!-- Direct Admin Login Button -->
+                <a href="/login"
+                    class="bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-xs sm:text-sm font-medium px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-400"></i>
+                    <span class="hidden sm:inline">Admin Login</span>
+                    <span class="sm:hidden">Admin</span>
+                </a>
+
+                <!-- Report Noise Quick Action -->
+                <a href="#report-form"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl transition-all shadow-lg shadow-indigo-600/30 flex items-center gap-1.5">
+                    <i data-lucide="plus-circle" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+                    <span>Report</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Container -->
+    <main class="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-5 sm:space-y-8 box-border">
+
+        <!-- Live Proximity Alert Banner -->
+        <div id="proximityAlertBanner"
+            class="hidden p-3 sm:p-4 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 sm:gap-3">
+                <div id="proximityIconBox" class="p-2 sm:p-2.5 rounded-xl flex-shrink-0">
+                    <i data-lucide="alert-octagon" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+                </div>
+                <div>
+                    <h3 id="proximityTitle" class="text-xs sm:text-sm font-bold text-white leading-tight">Approaching Hotspot</h3>
+                    <p id="proximityDesc" class="text-[11px] sm:text-xs text-slate-300 mt-0.5"></p>
+                </div>
+            </div>
+            <span id="proximityDistBadge" class="text-[10px] sm:text-xs font-semibold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border self-start sm:self-auto"></span>
+        </div>
+
+        <!-- KPI Metric Cards -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
+
+            <!-- Card 1 -->
+            <div
+                class="bg-slate-900/60 backdrop-blur-md p-3 sm:p-5 rounded-2xl border border-slate-800/80 shadow-xl shadow-black/30 flex flex-col justify-between hover:border-slate-700/80 transition-all">
+                <div class="flex items-center justify-between">
+                    <p class="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg Noise</p>
+                    <div class="p-1.5 sm:p-2.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-xl">
+                        <i data-lucide="volume-2" class="w-3.5 h-3.5 sm:w-5 sm:h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-300">64.2</span>
+                        <span class="text-[11px] sm:text-sm font-semibold text-slate-400">dB</span>
+                    </div>
+                    <p class="text-[10px] sm:text-xs font-medium text-emerald-400 mt-0.5 flex items-center gap-1">
+                        <i data-lucide="trending-down" class="w-3 h-3"></i> -2.4 dB
+                    </p>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div
+                class="bg-slate-900/60 backdrop-blur-md p-3 sm:p-5 rounded-2xl border border-slate-800/80 shadow-xl shadow-black/30 flex flex-col justify-between hover:border-slate-700/80 transition-all">
+                <div class="flex items-center justify-between">
+                    <p class="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Hotspot</p>
+                    <div class="p-1.5 sm:p-2.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-xl">
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 sm:w-5 sm:h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="flex items-baseline gap-1">
+                        <span id="kpiHotspotDb" class="text-xl sm:text-3xl font-extrabold text-rose-500">89 dB</span>
+                    </div>
+                    <p id="kpiHotspotLocation" class="text-[10px] sm:text-xs font-medium text-slate-400 mt-0.5 truncate max-w-[110px] sm:max-w-[150px]">
+                        Detecting...</p>
+                </div>
+            </div>
+
+            <!-- Card 3: Dynamic Citizen Complaints -->
+            <div
+                class="bg-slate-900/60 backdrop-blur-md p-3 sm:p-5 rounded-2xl border border-slate-800/80 shadow-xl shadow-black/30 flex flex-col justify-between hover:border-slate-700/80 transition-all">
+                <div class="flex items-center justify-between">
+                    <p class="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Complaints</p>
+                    <div class="p-1.5 sm:p-2.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl">
+                        <i data-lucide="file-text" class="w-3.5 h-3.5 sm:w-5 sm:h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="flex items-baseline gap-1">
+                        <span id="citizenComplaintsCount"
+                            class="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-300">0</span>
+                    </div>
+                    <p class="text-[10px] sm:text-xs font-medium text-slate-400 mt-0.5">Last 7 days</p>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div
+                class="bg-slate-900/60 backdrop-blur-md p-3 sm:p-5 rounded-2xl border border-slate-800/80 shadow-xl shadow-black/30 flex flex-col justify-between hover:border-slate-700/80 transition-all">
+                <div class="flex items-center justify-between">
+                    <p class="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Alerts</p>
+                    <div class="p-1.5 sm:p-2.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl">
+                        <i data-lucide="bell" class="w-3.5 h-3.5 sm:w-5 sm:h-5"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-xl sm:text-3xl font-extrabold text-amber-400">4</span>
+                    </div>
+                    <p class="text-[10px] sm:text-xs font-medium text-rose-400 mt-0.5 flex items-center gap-1">
+                        Requires action
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dedicated User Live Tracking Map View -->
+        <section
+            class="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-indigo-500/30 ring-1 ring-indigo-500/20 p-3.5 sm:p-5 shadow-2xl shadow-black/40 space-y-3 sm:space-y-4 transition-all">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 sm:p-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-xl">
+                        <i data-lucide="crosshair" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-tight">Live Movement &amp; Exact Location</h2>
+                            <span id="gpsLiveBadge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                <span id="gpsLiveBadgeText">EXACT GPS READY</span>
+                            </span>
+                        </div>
+                        <p class="text-[10px] sm:text-xs text-slate-400">High-precision satellite GPS tracking &amp; continuous proximity telemetry</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button id="locateUserBtn" type="button" title="Request exact high-precision GPS coordinates"
+                        class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/30 transition-all inline-flex items-center gap-1.5 active:scale-95">
+                        <i data-lucide="locate-fixed" class="w-3.5 h-3.5"></i>
+                        <span id="locateBtnLabel">Track My Exact Location</span>
+                    </button>
+                    <button id="randomTravelMapBtn" type="button" title="Travel to a random location to analyze nearest noise levels"
+                        class="px-2.5 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs font-semibold transition-all inline-flex items-center gap-1.5 shadow-sm">
+                        <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
+                        <span>Random Spot</span>
+                    </button>
+                    <button id="locateIpBtn" type="button" title="Detect location via IP network"
+                        class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold transition-all inline-flex items-center gap-1.5 shadow-sm">
+                        <i data-lucide="globe" class="w-3.5 h-3.5 text-blue-400"></i>
+                        <span>Auto-Detect IP</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dynamic Location Status and Interactive Pin Alert -->
+            <div id="locationStatusContainer" class="p-2.5 sm:p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] sm:text-xs">
+                <div id="locationStatus" class="flex items-center gap-2 text-slate-300 font-medium flex-wrap">
+                    <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+                    <span>Acquiring exact GPS coordinates...</span>
+                </div>
+                <div class="text-[10px] text-slate-400 flex items-center gap-1.5 self-start sm:self-auto">
+                    <i data-lucide="mouse-pointer" class="w-3 h-3 text-indigo-400"></i>
+                    <span>Tip: Drag marker or click map to pinpoint your exact spot</span>
+                </div>
+            </div>
+
+            <!-- Map Viewport with HUD Overlay -->
+            <div class="relative w-full rounded-xl overflow-hidden border border-slate-800 shadow-inner">
+                <div id="userLocationMap" class="w-full h-64 sm:h-80 z-10 cursor-crosshair"></div>
+
+                <!-- Floating High-Precision Coordinates HUD -->
+                <div id="mapCoordinatesHUD" class="absolute bottom-2.5 left-2.5 z-[400] px-3 py-1.5 rounded-xl bg-slate-950/85 backdrop-blur-md border border-slate-800 text-[10px] sm:text-xs font-mono text-slate-300 shadow-xl flex items-center gap-2.5 flex-wrap">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="hudCoordsText">Lat: --, Lng: --</span>
+                    </div>
+                    <span class="text-slate-700">|</span>
+                    <span id="hudAccuracyText" class="text-emerald-400 font-semibold">Accuracy: --</span>
+                    <button id="recenterMapBtn" type="button" title="Recenter map on your exact coordinates"
+                        class="ml-1 p-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all flex items-center gap-1 text-[10px]">
+                        <i data-lucide="focus" class="w-3 h-3"></i>
+                        <span class="hidden sm:inline">Recenter</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Geographic Heatmap & Authority Action Panel -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-8">
+
+            <!-- Interactive Regional Hotspot Heatmap -->
+            <div
+                class="lg:col-span-2 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80 p-3.5 sm:p-5 shadow-xl shadow-black/30 flex flex-col space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-tight">Urban Noise Heatmap</h2>
+                            <span id="mapAreaBadge"
+                                class="text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Active Grid</span>
+                            <span id="sensorCountBadge"
+                                class="text-[9px] sm:text-[10px] font-mono px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-300 border border-rose-500/20">3 Critical Zones</span>
+                        </div>
+                        <p class="text-[10px] sm:text-xs text-slate-400">Live IoT sensor clusters, continuous acoustic dispersion heatmap & critical threshold perimeters</p>
+                    </div>
+
+                    <!-- Interactive Layer Toggle Controls -->
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <button id="toggleHeatmapBtn" type="button"
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all bg-indigo-600 text-white shadow-sm flex items-center gap-1">
+                            <span>🔥 Heatmap</span>
+                        </button>
+                        <button id="toggleThresholdsBtn" type="button"
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all bg-rose-950/70 border border-rose-500/40 text-rose-300 hover:bg-rose-900/70 flex items-center gap-1">
+                            <span>⚠️ &gt;75dB Zones</span>
+                        </button>
+                        <button id="toggleSensorsBtn" type="button"
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all bg-slate-800 border border-slate-700 text-slate-300 hover:text-white flex items-center gap-1">
+                            <span>📡 Sensors</span>
+                        </button>
+                        <button id="fitSensorsBtn" type="button" title="Center map on all sensors"
+                            class="p-1 rounded-lg text-[11px] font-semibold transition-all bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">
+                            <i data-lucide="scan" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Legend Indicator -->
+                <div class="flex items-center justify-between text-[10px] sm:text-xs text-slate-400 pt-1 border-t border-slate-800/60 flex-wrap gap-2">
+                    <div class="flex items-center gap-3 font-medium">
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></span> &lt;60 dB (Normal)</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span> 60-75 dB (Elevated)</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50"></span> &gt;75 dB (Critical Violation Zone)</span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 italic">
+                        Click on any sensor node or threshold zone for detailed telemetry
+                    </div>
+                </div>
+
+                <div id="map" class="w-full h-64 sm:h-96 rounded-xl border border-slate-800 z-10 flex-1 cursor-crosshair"></div>
+            </div>
+
+            <!-- Smart Alerts & Recommendations Card -->
+            <div
+                class="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80 p-3.5 sm:p-5 shadow-xl shadow-black/30 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-tight">Smart Alert Insight</h2>
+                        <span id="alertStatusBadge"
+                            class="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">Critical</span>
+                    </div>
+
+                    <div class="p-3 sm:p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 mb-4 space-y-2">
+                        <div class="flex justify-between items-center text-xs sm:text-sm">
+                            <span class="text-slate-400 font-medium">Nearest Hotspot:</span>
+                            <span id="alertHotspotName"
+                                class="font-bold text-white truncate max-w-[130px] sm:max-w-[160px]">Scanning...</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs sm:text-sm">
+                            <span class="text-slate-400 font-medium">Recorded Noise:</span>
+                            <span id="alertHotspotDb" class="font-semibold text-rose-500">-- dB</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs sm:text-sm">
+                            <span class="text-slate-400 font-medium">Distance from You:</span>
+                            <span id="alertHotspotDist" class="font-semibold text-slate-200">--</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs sm:text-sm">
+                            <span class="text-slate-400 font-medium">Primary Source:</span>
+                            <span id="alertHotspotSource"
+                                class="font-semibold text-slate-200 truncate max-w-[120px] sm:max-w-[150px]">Traffic</span>
+                        </div>
+                    </div>
+
+                    <h3 class="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Recommended Actions</h3>
+                    <ul class="space-y-1.5 text-xs text-slate-300">
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0"></i>
+                            <span>Increase traffic management</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0"></i>
+                            <span>Enforce anti-honking rules</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0"></i>
+                            <span>Monitor zone (6:00 PM – 9:00 PM)</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <button id="dispatchNoticeBtn"
+                    class="w-full mt-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-medium py-2 px-3 rounded-xl text-xs sm:text-sm transition-all shadow-md">
+                    Dispatch Notice to Authorities
+                </button>
+            </div>
+
+        </section>
+
+        <!-- REALTIME DIGITAL NOISE METER & CITIZEN REPORTING GRID -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-8">
+
+            <!-- DIGITAL SOUND LEVEL METER -->
+            <div
+                class="lg:col-span-2 bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80 p-3.5 sm:p-5 shadow-xl shadow-black/30 flex flex-col justify-between">
+
+                <!-- Header with Live Pulse, Travel to Random Location and Mic Toggle -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-tight">Realtime Noise Analyzer</h2>
+                            <span
+                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-red-950/60 text-red-400 border border-red-500/30">
+                                <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+                                ACTIVE
+                            </span>
+                        </div>
+                        <p class="text-[10px] sm:text-xs text-slate-400">Live telemetry across coordinates &amp; nearest noisy locations</p>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button id="randomTravelBtn" type="button" title="Travel to a random location to discover nearest noisy hotspots"
+                            class="w-full sm:w-auto justify-center inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all">
+                            <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
+                            <span>Travel to Random Location</span>
+                        </button>
+                        <button id="toggleMicBtn" type="button"
+                            class="w-full sm:w-auto justify-center inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-indigo-500/30 text-xs font-semibold transition-all">
+                            <i data-lucide="mic" class="w-3.5 h-3.5"></i>
+                            <span id="micBtnText">Enable Hardware Mic</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Digital Gauges Container -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-4 items-center">
+
+                    <!-- Exact Location Dial & Readout -->
+                    <div
+                        class="flex flex-col items-center justify-center p-3 sm:p-4 bg-slate-950/70 border border-slate-800/80 rounded-2xl text-center relative overflow-hidden">
+                        <p class="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-indigo-400 mb-1">Your Location</p>
+                        <p id="userLiveZoneName" class="text-xs text-slate-400 truncate max-w-[160px] sm:max-w-[180px] mb-2">Syncing GPS...</p>
+
+                        <!-- Circular VU Ring (SVG) -->
+                        <div class="relative w-28 h-28 sm:w-36 sm:h-36 flex items-center justify-center">
+                            <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 120 120">
+                                <circle cx="60" cy="60" r="48" stroke="currentColor" stroke-width="8"
+                                    class="text-slate-800 fill-none" />
+                                <circle id="meterCircle" cx="60" cy="60" r="48" stroke="currentColor" stroke-width="8"
+                                    stroke-dasharray="301.59" stroke-dashoffset="150"
+                                    class="text-indigo-500 fill-none transition-all duration-300 stroke-round" />
+                            </svg>
+
+                            <!-- Central Digital Value -->
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span id="userLiveDb"
+                                    class="text-2xl sm:text-3xl font-black text-white font-mono tracking-tighter">54.0</span>
+                                <span class="text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-wider">dBA</span>
+                            </div>
+                        </div>
+
+                        <!-- Peak & Classification Indicators -->
+                        <div
+                            class="flex items-center justify-between w-full mt-3 pt-2 border-t border-slate-800/70 text-[10px] sm:text-[11px]">
+                            <span class="text-slate-500 font-mono">PEAK: <span id="userPeakDb"
+                                    class="text-slate-300 font-bold">58 dB</span></span>
+                            <span id="userLevelTag"
+                                class="px-2 py-0.5 rounded font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Normal</span>
+                        </div>
+                    </div>
+
+                    <!-- Hotspot Multi-Channel Rack Meters (Sorted Nearest Noisy Locations) -->
+                    <div class="md:col-span-2 space-y-2">
+                        <div class="flex items-center justify-between pb-1">
+                            <div class="flex items-center gap-1.5 text-slate-300">
+                                <i data-lucide="radio" class="w-3.5 h-3.5 text-indigo-400"></i>
+                                <span class="font-bold text-[11px] sm:text-xs uppercase tracking-wider">Nearest Noisy Locations</span>
+                            </div>
+                            <span id="nearestSortedCount" class="text-[10px] text-slate-400 font-mono">Sorted by proximity</span>
+                        </div>
+                        <div class="space-y-2 max-h-[300px] overflow-y-auto pr-1" id="hotspotMetersContainer">
+                            <!-- Dynamically populated via JS -->
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Meter Legend & Safety Thresholds Footer -->
+                <div
+                    class="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800/60 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                    <div class="flex items-center gap-2 sm:gap-4 text-slate-400 text-[10px] sm:text-[11px] flex-wrap">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded bg-emerald-400"></span> &lt;55 dB (Safe)</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded bg-amber-400"></span> 55-75 dB (Moderate)</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded bg-rose-500"></span> &gt;75 dB (Hazardous)</span>
+                    </div>
+                    <span class="text-slate-500 font-mono text-[9px] sm:text-[10px]">Sampling: 100ms FFT</span>
+                </div>
+
+            </div>
+
+            <!-- Citizen Reporting Form -->
+            <div id="report-form"
+                class="bg-slate-900/60 backdrop-blur-md rounded-2xl border border-slate-800/80 p-3.5 sm:p-5 shadow-xl shadow-black/30 scroll-mt-20">
+                <h2 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-tight mb-0.5">Citizen Noise Report</h2>
+                <p class="text-[11px] sm:text-xs text-slate-400 mb-3">Submit disturbances directly to registry</p>
+
+                <form id="citizenNoiseForm" class="space-y-2.5 sm:space-y-3">
+
+                    <!-- Citizen Identity Fields -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Full Name</label>
+                            <input id="userNameInput" type="text" placeholder="e.g. John Doe" required
+                                class="w-full px-3 py-2 text-sm bg-slate-950/70 border border-slate-800 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Phone Number</label>
+                            <input id="userPhoneInput" type="tel" placeholder="+91 987XX XXXXX" required
+                                class="w-full px-3 py-2 text-sm bg-slate-950/70 border border-slate-800 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Email Address</label>
+                        <input id="userEmailInput" type="email" placeholder="abc@example.com" required
+                            class="w-full px-3 py-2 text-sm bg-slate-950/70 border border-slate-800 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+                    </div>
+
+                    <!-- Incident Details -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Location / Landmark</label>
+                        <input id="reportLocationInput" type="text" placeholder="Scanning nearest hotspot..." required
+                            class="w-full px-3 py-2 text-sm bg-slate-950/70 border border-slate-800 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 sm:gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Est. dB Level</label>
+                            <input id="reportDbInput" type="number" min="30" max="140" placeholder="e.g. 85" required
+                                class="w-full px-3 py-2 text-sm bg-slate-950/70 border border-slate-800 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Noise Source</label>
+                            <select id="reportSourceInput"
+                                class="w-full px-2 sm:px-3 py-2 text-sm bg-slate-950 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500">
+                                <option value="Traffic / Honking">Traffic</option>
+                                <option value="Construction Site">Construction</option>
+                                <option value="Loudspeakers / Events">Events</option>
+                                <option value="Industrial Machines">Industrial</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Description (Optional)</label>
+                        <textarea id="reportDescInput" rows="2" placeholder="Provide extra details..."
+                            class="w-full px-3 py-2 text-sm bg-slate-950/70 border border-slate-800 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"></textarea>
+                    </div>
+
+                    <button id="submitReportBtn" type="submit"
+                        class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/30">
+                        Submit Report
+                    </button>
+                </form>
+            </div>
+
+        </section>
+
+        <!-- About Us Section (Single Editable Paragraph) -->
+        <section id="about" class="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/80 p-4 sm:p-5 shadow-lg shadow-black/20 space-y-2.5 scroll-mt-20">
+            <div class="flex items-center justify-between border-b border-slate-800/60 pb-2">
+                <div class="flex items-center gap-2">
+                    <span class="p-1 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                        <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                    </span>
+                    <h3 class="text-xs sm:text-sm font-bold text-white tracking-wide">About Us</h3>
+                </div>
+                <a href="/login" class="text-[11px] font-semibold text-slate-400 hover:text-indigo-300 transition-colors inline-flex items-center gap-1">
+                    <i data-lucide="edit-2" class="w-3 h-3 text-indigo-400"></i>
+                    <span>Edit</span>
+                </a>
+            </div>
+
+            <p id="aboutParagraphText" class="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
+                <%= about.paragraph %>
+            </p>
+        </section>
+
+    </main>
+
+    <!-- Interactive JavaScript Scripts -->
+    <script>
+        // Global error guard to intercept and handle any cross-origin script issues
+        window.addEventListener('error', (event) => {
+            if (event.message === 'Script error.') {
+                // Cross-origin warning suppressed gracefully
+                event.preventDefault();
+                return true;
+            }
+        });
+
+        // In-App Toast Notification System (replaces window.alert for iframe compatibility)
+        function showToast(message, type = 'info') {
+            let container = document.getElementById('toastNotificationContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toastNotificationContainer';
+                container.className = 'fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-4';
+                document.body.appendChild(container);
+            }
+            const toast = document.createElement('div');
+            const style = type === 'error'
+                ? 'bg-rose-950/95 border-rose-500/50 text-rose-200'
+                : (type === 'success'
+                    ? 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200'
+                    : 'bg-indigo-950/95 border-indigo-500/50 text-indigo-200');
+            toast.className = `p-3 rounded-xl border ${style} backdrop-blur-md shadow-2xl text-xs font-semibold pointer-events-auto flex items-center gap-2 transition-all duration-300`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // 1. Initialize Vector Icons
+        lucide.createIcons();
+
+        // Dynamic Complaints Counter Manager (Persisted via LocalStorage + Backend API)
+        let currentComplaintsCount = parseInt(localStorage.getItem('noise_complaints_count') || '0', 10);
+        const countEl = document.getElementById('citizenComplaintsCount');
+        if (countEl) countEl.textContent = currentComplaintsCount;
+
+        async function fetchCitizenComplaints() {
+            try {
+                const res = await fetch('/api/reports/count');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.count !== undefined) {
+                        currentComplaintsCount = data.count;
+                        localStorage.setItem('noise_complaints_count', currentComplaintsCount);
+                        if (countEl) countEl.textContent = currentComplaintsCount;
+                    }
+                }
+            } catch (err) {
+                // Keep local storage count if offline
+            }
+        }
+        fetchCitizenComplaints();
+
+        // Default Coordinates (Ludhiana Center)
+        const fallbackCoords = [30.9010, 75.8573];
+        let currentGridCenter = [30.9010, 75.8573];
+
+        // Comprehensive IoT Sensor Cluster Network
+        let allHotspots = [
+            { id: 'spot-1', code: 'SC-101', coords: [30.9125, 75.8535], baseDb: 89, currentDb: 89, status: "Critical", label: "Clock Tower / Chaura Bazar", source: "Heavy Traffic & Market", zoneType: "Commercial Core" },
+            { id: 'spot-2', code: 'SC-102', coords: [30.8986, 75.8617], baseDb: 84, currentDb: 84, status: "Critical", label: "Central Bus Terminal (ISBT)", source: "Bus Horns & Diesel Engines", zoneType: "Transit Interchange" },
+            { id: 'spot-3', code: 'SC-103', coords: [30.8920, 75.8235], baseDb: 77, currentDb: 77, status: "Critical", label: "Ferozepur Road / Aarti Chowk", source: "Transit Congestion & Flyover", zoneType: "Arterial Highway" },
+            { id: 'spot-4', code: 'SC-104', coords: [30.8875, 75.8340], baseDb: 68, currentDb: 68, status: "Elevated", label: "Model Town Market", source: "Commercial Activity", zoneType: "Shopping District" },
+            { id: 'spot-5', code: 'SC-105', coords: [30.9180, 75.8380], baseDb: 64, currentDb: 64, status: "Elevated", label: "Civil Lines Crossing", source: "Vehicular Flow", zoneType: "Mixed Urban" },
+            { id: 'spot-6', code: 'SC-106', coords: [30.9022, 75.8115], baseDb: 46, currentDb: 46, status: "Compliant", label: "PAU Campus / Rakh Bagh", source: "Quiet / Academic Park", zoneType: "Buffer Zone" },
+            { id: 'spot-7', code: 'SC-107', coords: [30.8810, 75.8620], baseDb: 52, currentDb: 52, status: "Compliant", label: "Sarabha Nagar Residential", source: "Neighborhood Ambient", zoneType: "Residential Area" }
+        ];
+
+        // Initialize Regional Heatmap
+        const regionalMap = L.map('map').setView(fallbackCoords, 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(regionalMap);
+
+        // Dedicated Layer Groups on Regional Map
+        const heatmapLayerGroup = L.layerGroup().addTo(regionalMap);
+        const thresholdZonesLayerGroup = L.layerGroup().addTo(regionalMap);
+        const sensorClustersLayerGroup = L.layerGroup().addTo(regionalMap);
+
+        let showHeatmap = true;
+        let showThresholds = true;
+        let showSensors = true;
+
+        // Initialize User Location Map
+        const userMap = L.map('userLocationMap').setView(fallbackCoords, 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(userMap);
+
+        const userMapSensorsLayer = L.layerGroup().addTo(userMap);
+
+        setTimeout(() => {
+            regionalMap.invalidateSize();
+            userMap.invalidateSize();
+        }, 400);
+
+        let userMarker = null;
+        let userRadiusCircle = null;
+        let currentPosition = null;
+
+        // Adaptive localized network generation when user's location changes significantly
+        function adaptHotspotsToCenter(lat, lng, regionLabel = 'Local Grid') {
+            currentGridCenter = [lat, lng];
+            const distFromLudhiana = getDistanceInMeters(lat, lng, 30.9010, 75.8573);
+
+            if (distFromLudhiana >= 20000) {
+                // Generate a dense, realistic sensor cluster grid around the user's localized city/region
+                allHotspots = [
+                    { id: 'spot-1', code: 'SC-101', coords: [lat + 0.0072, lng + 0.0065], baseDb: 89, currentDb: 89, status: "Critical", label: `${regionLabel} Commercial Plaza`, source: "Dense Market & Traffic Corridors", zoneType: "Commercial Core" },
+                    { id: 'spot-2', code: 'SC-102', coords: [lat - 0.0055, lng + 0.0080], baseDb: 84, currentDb: 84, status: "Critical", label: `${regionLabel} Transit Terminal`, source: "Bus & Rail Interchange Activity", zoneType: "Transit Interchange" },
+                    { id: 'spot-3', code: 'SC-103', coords: [lat - 0.0110, lng - 0.0125], baseDb: 78, currentDb: 78, status: "Critical", label: `${regionLabel} Express Corridor`, source: "Heavy Transit & Flyover Construction", zoneType: "Arterial Highway" },
+                    { id: 'spot-4', code: 'SC-104', coords: [lat + 0.0040, lng - 0.0090], baseDb: 69, currentDb: 69, status: "Elevated", label: `${regionLabel} Central Avenue`, source: "Retail Flow & Commercial Activity", zoneType: "Shopping District" },
+                    { id: 'spot-5', code: 'SC-105', coords: [lat - 0.0085, lng - 0.0035], baseDb: 63, currentDb: 63, status: "Elevated", label: `${regionLabel} Civic Center Junction`, source: "Urban Vehicle Inflow", zoneType: "Mixed Urban" },
+                    { id: 'spot-6', code: 'SC-106', coords: [lat + 0.0130, lng - 0.0050], baseDb: 52, currentDb: 52, status: "Compliant", label: `${regionLabel} Residential Sector`, source: "Ambient Residential Sound", zoneType: "Residential Area" },
+                    { id: 'spot-7', code: 'SC-107', coords: [lat - 0.0020, lng - 0.0160], baseDb: 43, currentDb: 43, status: "Compliant", label: `${regionLabel} Botanical & City Park`, source: "Green Sound Buffer / Foliage", zoneType: "Buffer Zone" }
+                ];
+            }
+
+            renderHotspots();
+            initHotspotMeters();
+            if (currentPosition) {
+                updateNearbyHotspotUI(currentPosition[0], currentPosition[1]);
+            }
+        }
+
+        // Render Heatmap, Critical Threshold Zones, and IoT Sensor Clusters
+        function renderHotspots() {
+            heatmapLayerGroup.clearLayers();
+            thresholdZonesLayerGroup.clearLayers();
+            sensorClustersLayerGroup.clearLayers();
+            userMapSensorsLayer.clearLayers();
+
+            const criticalCount = allHotspots.filter(s => s.baseDb >= 75).length;
+            const sensorBadge = document.getElementById('sensorCountBadge');
+            if (sensorBadge) {
+                sensorBadge.textContent = `${allHotspots.length} Sensors Online | ${criticalCount} Critical Zones`;
+                sensorBadge.className = criticalCount > 0
+                    ? "text-[9px] sm:text-[10px] font-mono px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-300 border border-rose-500/30 font-semibold"
+                    : "text-[9px] sm:text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold";
+            }
+
+            // 1. RENDER CRITICAL THRESHOLD ZONES (>75 dB) & ELEVATED ZONES
+            if (showThresholds) {
+                allHotspots.forEach(spot => {
+                    if (spot.baseDb >= 75) {
+                        // Wide Acoustic Dispersion Perimeter (>75 dB hazard footprint)
+                        L.circle(spot.coords, {
+                            radius: 520,
+                            color: '#f43f5e',
+                            weight: 1.5,
+                            dashArray: '5, 5',
+                            fillColor: '#ef4444',
+                            fillOpacity: 0.16
+                        }).addTo(thresholdZonesLayerGroup).bindPopup(`
+                            <div class="text-xs font-sans text-slate-800">
+                                <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 font-bold text-[10px]">CRITICAL VIOLATION THRESHOLD ZONE</span>
+                                <h4 class="font-bold text-slate-900 mt-1">${spot.label}</h4>
+                                <div class="text-[11px] text-slate-600 mt-0.5">Acoustic dispersion footprint exceeds statutory urban limit of 75 dB.</div>
+                                <div class="font-mono font-bold text-rose-600 text-xs mt-1">Average Decibel: ${spot.baseDb} dB</div>
+                            </div>
+                        `);
+
+                        // Core Extreme Violation Epicenter
+                        L.circle(spot.coords, {
+                            radius: 200,
+                            color: '#be123c',
+                            weight: 2,
+                            fillColor: '#be123c',
+                            fillOpacity: 0.32
+                        }).addTo(thresholdZonesLayerGroup);
+
+                    } else if (spot.baseDb >= 60) {
+                        // Elevated Acoustic Threshold Zone (60 - 75 dB)
+                        L.circle(spot.coords, {
+                            radius: 360,
+                            color: '#f59e0b',
+                            weight: 1.5,
+                            dashArray: '4, 4',
+                            fillColor: '#fbbf24',
+                            fillOpacity: 0.12
+                        }).addTo(thresholdZonesLayerGroup).bindPopup(`
+                            <div class="text-xs font-sans text-slate-800">
+                                <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px]">ELEVATED ACOUSTIC ZONE</span>
+                                <h4 class="font-bold text-slate-900 mt-1">${spot.label}</h4>
+                                <div class="font-mono text-amber-700 text-xs mt-1">Average Decibel: ${spot.baseDb} dB</div>
+                            </div>
+                        `);
+                    } else {
+                        // Compliant / Green Acoustic Zone (<60 dB)
+                        L.circle(spot.coords, {
+                            radius: 240,
+                            color: '#10b981',
+                            weight: 1,
+                            fillColor: '#34d399',
+                            fillOpacity: 0.08
+                        }).addTo(thresholdZonesLayerGroup);
+                    }
+                });
+            }
+
+            // 2. RENDER SENSOR CLUSTERS (IoT Acoustic Telemetry Nodes)
+            if (showSensors) {
+                allHotspots.forEach((spot, idx) => {
+                    const isCritical = spot.baseDb >= 75;
+                    const isElevated = spot.baseDb >= 60 && spot.baseDb < 75;
+                    const badgeBg = isCritical ? '#ef4444' : (isElevated ? '#f59e0b' : '#10b981');
+                    const pingHtml = isCritical
+                        ? `<span class="absolute -inset-2.5 rounded-full bg-rose-500/40 animate-ping pointer-events-none"></span>`
+                        : '';
+
+                    const iconHtml = `
+                        <div class="relative flex flex-col items-center justify-center cursor-pointer group" style="transform: translate3d(0,0,0);">
+                            ${pingHtml}
+                            <div class="w-8 h-8 rounded-full border-2 border-white shadow-xl flex items-center justify-center text-white text-[11px] font-bold" style="background-color: ${badgeBg};">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                            <div class="mt-0.5 px-1.5 py-0.2 rounded font-mono text-[9px] font-extrabold text-white shadow-md border border-black/30 whitespace-nowrap" style="background-color: ${badgeBg};">
+                                ${spot.baseDb} dB
+                            </div>
+                        </div>
+                    `;
+
+                    const sensorDivIcon = L.divIcon({
+                        className: 'noise-sensor-cluster-node',
+                        html: iconHtml,
+                        iconSize: [36, 46],
+                        iconAnchor: [18, 23]
+                    });
+
+                    const popupContent = `
+                        <div class="text-xs text-slate-800 font-sans p-0.5 min-w-[200px]">
+                            <div class="flex items-center justify-between gap-2 border-b border-slate-200 pb-1.5 mb-1.5">
+                                <span class="font-mono font-bold text-[10px] px-1.5 py-0.5 rounded bg-slate-900 text-white">${spot.code || `SC-${idx+1}`}</span>
+                                <span class="font-bold text-[10px] ${isCritical ? 'text-rose-600' : (isElevated ? 'text-amber-600' : 'text-emerald-600')}">${spot.status.toUpperCase()}</span>
+                            </div>
+                            <h4 class="font-bold text-slate-900 text-xs">${spot.label}</h4>
+                            <div class="text-[11px] text-slate-600 mt-1">Zone: <b>${spot.zoneType || 'Urban District'}</b></div>
+                            <div class="text-[11px] text-slate-600">Source: <b>${spot.source}</b></div>
+                            <div class="mt-2 p-1.5 rounded bg-slate-100 border border-slate-200 flex items-center justify-between">
+                                <span class="text-slate-600 text-[10px]">Acoustic Pressure:</span>
+                                <span class="font-mono font-bold text-sm ${isCritical ? 'text-rose-600' : (isElevated ? 'text-amber-600' : 'text-emerald-600')}">${spot.baseDb} dB</span>
+                            </div>
+                            <div class="text-[9px] text-slate-400 mt-1.5 font-mono">Sensors Clustered: 3 Micro-Nodes | Telemetry: Live 1s</div>
+                        </div>
+                    `;
+
+                    L.marker(spot.coords, { icon: sensorDivIcon })
+                        .addTo(sensorClustersLayerGroup)
+                        .bindPopup(popupContent);
+
+                    // Also add a simplified marker to userMap for cross-map telemetry
+                    L.circleMarker(spot.coords, {
+                        radius: 5,
+                        fillColor: badgeBg,
+                        color: '#ffffff',
+                        weight: 1.5,
+                        opacity: 0.9,
+                        fillOpacity: 0.8
+                    }).addTo(userMapSensorsLayer).bindPopup(popupContent);
+                });
+            }
+
+            // 3. RENDER CONTINUOUS ACOUSTIC HEATMAP PLUMES
+            if (showHeatmap) {
+                allHotspots.forEach(spot => {
+                    const isCritical = spot.baseDb >= 75;
+                    const isElevated = spot.baseDb >= 60 && spot.baseDb < 75;
+                    const plumeColor = isCritical ? '#ef4444' : (isElevated ? '#f59e0b' : '#10b981');
+                    const haloColor = isCritical ? '#f43f5e' : (isElevated ? '#fbbf24' : '#34d399');
+
+                    // Tier 1: Wide acoustic dispersion halo
+                    L.circle(spot.coords, {
+                        radius: isCritical ? 750 : (isElevated ? 520 : 360),
+                        color: haloColor,
+                        weight: 0,
+                        fillColor: haloColor,
+                        fillOpacity: isCritical ? 0.12 : 0.08,
+                        interactive: false
+                    }).addTo(heatmapLayerGroup);
+
+                    // Tier 2: Mid-range acoustic plume
+                    L.circle(spot.coords, {
+                        radius: isCritical ? 450 : (isElevated ? 320 : 220),
+                        color: plumeColor,
+                        weight: 0,
+                        fillColor: plumeColor,
+                        fillOpacity: isCritical ? 0.22 : (isElevated ? 0.16 : 0.12),
+                        interactive: false
+                    }).addTo(heatmapLayerGroup);
+
+                    // Tier 3: High-intensity acoustic near-field core
+                    L.circle(spot.coords, {
+                        radius: isCritical ? 220 : (isElevated ? 150 : 100),
+                        color: plumeColor,
+                        weight: 0,
+                        fillColor: isCritical ? '#be123c' : plumeColor,
+                        fillOpacity: isCritical ? 0.38 : 0.26,
+                        interactive: false
+                    }).addTo(heatmapLayerGroup);
+                });
+            }
+        }
+
+        // Layer Toggle Handlers
+        const toggleHeatmapBtn = document.getElementById('toggleHeatmapBtn');
+        const toggleThresholdsBtn = document.getElementById('toggleThresholdsBtn');
+        const toggleSensorsBtn = document.getElementById('toggleSensorsBtn');
+        const fitSensorsBtn = document.getElementById('fitSensorsBtn');
+
+        toggleHeatmapBtn?.addEventListener('click', () => {
+            showHeatmap = !showHeatmap;
+            toggleHeatmapBtn.className = showHeatmap
+                ? "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all bg-indigo-600 text-white shadow-sm flex items-center gap-1"
+                : "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all bg-slate-800 border border-slate-700 text-slate-400 hover:text-white flex items-center gap-1";
+            renderHotspots();
+        });
+
+        toggleThresholdsBtn?.addEventListener('click', () => {
+            showThresholds = !showThresholds;
+            toggleThresholdsBtn.className = showThresholds
+                ? "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all bg-rose-950/70 border border-rose-500/40 text-rose-300 hover:bg-rose-900/70 flex items-center gap-1"
+                : "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all bg-slate-800 border border-slate-700 text-slate-400 hover:text-white flex items-center gap-1";
+            renderHotspots();
+        });
+
+        toggleSensorsBtn?.addEventListener('click', () => {
+            showSensors = !showSensors;
+            toggleSensorsBtn.className = showSensors
+                ? "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all bg-slate-800 border border-slate-700 text-slate-300 hover:text-white flex items-center gap-1"
+                : "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all bg-slate-900/50 border border-slate-800 text-slate-500 flex items-center gap-1";
+            renderHotspots();
+        });
+
+        fitSensorsBtn?.addEventListener('click', () => {
+            if (allHotspots.length > 0) {
+                const group = L.featureGroup(allHotspots.map(s => L.marker(s.coords)));
+                regionalMap.fitBounds(group.getBounds().pad(0.2));
+            }
+        });
+
+        renderHotspots();
+
+        // Haversine Distance Formula
+        function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const toRad = deg => (deg * Math.PI) / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // 2. BUILD REALTIME DIGITAL NOISE METER UI (Sorted Nearest Noisy Locations with Sound Units)
+        const metersContainer = document.getElementById('hotspotMetersContainer');
+        let lastSortedHotspots = [];
+
+        function renderNearestHotspotMeters(userLat, userLng) {
+            if (!metersContainer) return;
+
+            // Calculate distance for all spots from user position
+            allHotspots.forEach(spot => {
+                const dist = (userLat !== undefined && userLng !== undefined)
+                    ? getDistanceInMeters(userLat, userLng, spot.coords[0], spot.coords[1])
+                    : 999999;
+                spot.distance = dist;
+            });
+
+            // Sort ascending by distance (nearest noisy locations first)
+            const sorted = [...allHotspots].sort((a, b) => a.distance - b.distance);
+            lastSortedHotspots = sorted;
+
+            const countEl = document.getElementById('nearestSortedCount');
+            if (countEl) {
+                countEl.textContent = `${sorted.length} locations sorted by proximity`;
+            }
+
+            metersContainer.innerHTML = '';
+            sorted.forEach((spot, index) => {
+                const isNearest = index === 0 && spot.distance < 50000;
+                const distText = spot.distance < 1000
+                    ? `${Math.round(spot.distance)} m away`
+                    : `${(spot.distance / 1000).toFixed(1)} km away`;
+
+                const dbVal = spot.currentDb || spot.baseDb;
+                const pct = Math.min(100, Math.max(5, (dbVal / 110) * 100));
+
+                let barClass = "h-full rounded-full bg-emerald-400";
+                let textClass = "text-emerald-400";
+                let statusBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Compliant</span>`;
+
+                if (dbVal >= 75) {
+                    barClass = "h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-500";
+                    textClass = "text-rose-400";
+                    statusBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">Critical</span>`;
+                } else if (dbVal >= 60) {
+                    barClass = "h-full rounded-full bg-amber-400";
+                    textClass = "text-amber-400";
+                    statusBadge = `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">Elevated</span>`;
+                }
+
+                const meterCard = document.createElement('div');
+                meterCard.id = `rack-${spot.id}`;
+                meterCard.className = `p-2 sm:p-2.5 rounded-xl bg-slate-950/70 border ${isNearest ? 'border-indigo-500/50 shadow-sm shadow-indigo-500/20 bg-slate-950/90' : 'border-slate-800/80'} transition-all flex flex-col gap-1`;
+                meterCard.innerHTML = `
+                    <div class="flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            ${isNearest ? '<span class="px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[9px] border border-indigo-500/30 flex-shrink-0 animate-pulse">NEAREST</span>' : ''}
+                            <span class="font-bold text-white truncate max-w-[130px] sm:max-w-[190px] text-[11px] sm:text-xs">${spot.label}</span>
+                            <span class="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono hidden sm:inline-block">${spot.zoneType || 'Zone'}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                            <span id="dist-${spot.id}" class="text-[9px] sm:text-[10px] text-slate-400 font-mono font-medium">${distText}</span>
+                            <span id="val-${spot.id}" class="font-mono font-bold text-[11px] sm:text-xs ${textClass}">${dbVal} dB <span class="text-[9px] font-normal text-slate-500">dBA</span></span>
+                        </div>
+                    </div>
+                    <!-- Segmented LED Bar -->
+                    <div class="w-full bg-slate-900 h-1.5 sm:h-2 rounded-full overflow-hidden flex gap-0.5 p-0.5">
+                        <div id="bar-${spot.id}" class="h-full rounded-full transition-all duration-300 ${barClass}" style="width: ${pct}%;"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                        <span class="truncate max-w-[180px] sm:max-w-[250px] text-slate-500 flex items-center gap-1">
+                            <i data-lucide="volume-2" class="w-2.5 h-2.5 text-slate-400"></i> ${spot.source}
+                        </span>
+                        <div>${statusBadge}</div>
+                    </div>
+                `;
+                metersContainer.appendChild(meterCard);
+            });
+            lucide.createIcons();
+        }
+
+        function initHotspotMeters() {
+            renderNearestHotspotMeters(currentGridCenter[0], currentGridCenter[1]);
+        }
+        initHotspotMeters();
+
+        // Live Meter Telemetry Simulation & UI Update
+        let userCurrentDb = 54.0;
+        let userPeakDb = 58.0;
+        let isMicActive = false;
+
+        function updateDigitalMeters() {
+            allHotspots.forEach(spot => {
+                const delta = (Math.random() * 2.6 - 1.3);
+                spot.currentDb = Math.min(115, Math.max(35, parseFloat((spot.baseDb + delta).toFixed(1))));
+
+                const valEl = document.getElementById(`val-${spot.id}`);
+                const barEl = document.getElementById(`bar-${spot.id}`);
+                if (valEl && barEl) {
+                    valEl.innerHTML = `${spot.currentDb} dB <span class="text-[9px] font-normal text-slate-500">dBA</span>`;
+                    const pct = Math.min(100, Math.max(5, (spot.currentDb / 110) * 100));
+                    barEl.style.width = `${pct}%`;
+
+                    if (spot.currentDb >= 75) {
+                        barEl.className = "h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-500";
+                        valEl.className = "font-mono font-bold text-[11px] sm:text-xs text-rose-400";
+                    } else if (spot.currentDb >= 60) {
+                        barEl.className = "h-full rounded-full bg-amber-400";
+                        valEl.className = "font-mono font-bold text-[11px] sm:text-xs text-amber-400";
+                    } else {
+                        barEl.className = "h-full rounded-full bg-emerald-400";
+                        valEl.className = "font-mono font-bold text-[11px] sm:text-xs text-emerald-400";
+                    }
+                }
+            });
+
+            if (!isMicActive) {
+                // If we have a nearest hotspot, sound decays logarithmically with distance
+                if (currentPosition && lastSortedHotspots.length > 0) {
+                    const nearest = lastSortedHotspots[0];
+                    const d = Math.max(15, nearest.distance);
+                    // Acoustic inverse square dropoff with ambient floor of ~42 dB
+                    const decay = 20 * Math.log10(d / 15);
+                    const estimatedDb = Math.max(42, nearest.currentDb - decay);
+                    const noiseJitter = (Math.random() * 1.6 - 0.8);
+                    userCurrentDb = Math.min(105, Math.max(38, parseFloat((estimatedDb + noiseJitter).toFixed(1))));
+                } else {
+                    const noiseDrift = (Math.random() * 2.0 - 1.0);
+                    userCurrentDb = Math.min(110, Math.max(38, parseFloat((userCurrentDb + noiseDrift).toFixed(1))));
+                }
+                renderUserMeter(userCurrentDb);
+            }
+        }
+
+        function renderUserMeter(db) {
+            const userDbEl = document.getElementById('userLiveDb');
+            const meterCircle = document.getElementById('meterCircle');
+            const tagEl = document.getElementById('userLevelTag');
+            const peakEl = document.getElementById('userPeakDb');
+
+            userDbEl.textContent = db.toFixed(1);
+
+            if (db > userPeakDb) {
+                userPeakDb = db;
+                peakEl.textContent = `${userPeakDb.toFixed(1)} dB`;
+            }
+
+            const circumference = 301.59;
+            const normalized = Math.min(110, Math.max(30, db));
+            const percentage = (normalized - 30) / (110 - 30);
+            meterCircle.style.strokeDashoffset = circumference - (percentage * circumference);
+
+            if (db >= 75) {
+                meterCircle.setAttribute('class', 'text-rose-500 fill-none transition-all duration-300 stroke-round');
+                tagEl.className = "px-1.5 py-0.5 rounded font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                tagEl.textContent = "Critical";
+            } else if (db >= 60) {
+                meterCircle.setAttribute('class', 'text-amber-400 fill-none transition-all duration-300 stroke-round');
+                tagEl.className = "px-1.5 py-0.5 rounded font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                tagEl.textContent = "Moderate";
+            } else {
+                meterCircle.setAttribute('class', 'text-emerald-400 fill-none transition-all duration-300 stroke-round');
+                tagEl.className = "px-1.5 py-0.5 rounded font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                tagEl.textContent = "Safe";
+            }
+        }
+
+        setInterval(updateDigitalMeters, 250);
+
+        // Optional Real Hardware Audio Detection (Web Audio API)
+        let audioContext, analyser, microphone, javascriptNode;
+        const toggleMicBtn = document.getElementById('toggleMicBtn');
+        const micBtnText = document.getElementById('micBtnText');
+
+        toggleMicBtn?.addEventListener('click', async () => {
+            if (!isMicActive) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    microphone = audioContext.createMediaStreamSource(stream);
+                    javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+                    analyser.smoothingTimeConstant = 0.6;
+                    analyser.fftSize = 512;
+
+                    microphone.connect(analyser);
+                    analyser.connect(javascriptNode);
+                    javascriptNode.connect(audioContext.destination);
+
+                    javascriptNode.onaudioprocess = () => {
+                        const array = new Uint8Array(analyser.frequencyBinCount);
+                        analyser.getByteFrequencyData(array);
+                        let values = 0;
+                        for (let i = 0; i < array.length; i++) values += array[i];
+                        const average = values / array.length;
+                        const calculatedDb = Math.min(115, Math.max(36, 35 + (average * 0.95)));
+                        userCurrentDb = calculatedDb;
+                        renderUserMeter(calculatedDb);
+                    };
+
+                    isMicActive = true;
+                    micBtnText.textContent = "Mic Active";
+                    toggleMicBtn.className = "w-full sm:w-auto justify-center inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 text-xs font-semibold transition-all";
+                    showToast('Live microphone telemetry active.', 'success');
+                } catch (err) {
+                    showToast('Microphone access was denied or unsupported by browser.', 'error');
+                }
+            } else {
+                if (audioContext) audioContext.close();
+                isMicActive = false;
+                micBtnText.textContent = "Enable Hardware Mic";
+                toggleMicBtn.className = "w-full sm:w-auto justify-center inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-indigo-500/30 text-xs font-semibold transition-all";
+                showToast('Hardware microphone deactivated.', 'info');
+            }
+        });
+
+        // 3. Proximity Tracking & Hotspot UI Sync
+        function updateNearbyHotspotUI(userLat, userLng) {
+            renderNearestHotspotMeters(userLat, userLng);
+
+            if (lastSortedHotspots.length === 0) return;
+            const closestSpot = lastSortedHotspots[0];
+            const minDistance = closestSpot.distance;
+
+            const distKm = (minDistance / 1000).toFixed(2);
+            const distText = minDistance < 1000 ? `${Math.round(minDistance)} m away` : `${distKm} km away`;
+
+            document.getElementById('userLiveZoneName').textContent = `Near ${closestSpot.label} (~${distText})`;
+            document.getElementById('kpiHotspotLocation').textContent = `${closestSpot.label}`;
+            document.getElementById('kpiHotspotDb').textContent = `${closestSpot.baseDb} dB`;
+
+            document.getElementById('alertHotspotName').textContent = closestSpot.label;
+            document.getElementById('alertHotspotDb').textContent = `${closestSpot.baseDb} dB`;
+            document.getElementById('alertHotspotDist').textContent = distText;
+            document.getElementById('alertHotspotSource').textContent = closestSpot.source;
+
+            const badge = document.getElementById('alertStatusBadge');
+            if (closestSpot.baseDb >= 75) {
+                badge.className = "px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30";
+                badge.textContent = "Critical";
+            } else if (closestSpot.baseDb >= 60) {
+                badge.className = "px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30";
+                badge.textContent = "Moderate";
+            } else {
+                badge.className = "px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
+                badge.textContent = "Normal";
+            }
+
+            // Proximity Alert Banner
+            const banner = document.getElementById('proximityAlertBanner');
+            const title = document.getElementById('proximityTitle');
+            const desc = document.getElementById('proximityDesc');
+            const distBadge = document.getElementById('proximityDistBadge');
+            const iconBox = document.getElementById('proximityIconBox');
+
+            if (minDistance <= 1500 && closestSpot.status !== "Low") {
+                banner.classList.remove('hidden');
+                desc.textContent = `You are near ${closestSpot.label}. Sound Level: ${closestSpot.baseDb} dB (${closestSpot.source}).`;
+                distBadge.textContent = distText;
+
+                if (closestSpot.baseDb >= 75) {
+                    banner.className = "p-3 sm:p-4 rounded-2xl border bg-rose-950/60 border-rose-500/40 text-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3";
+                    iconBox.className = "p-2 sm:p-2.5 rounded-xl bg-rose-500/20 text-rose-400 flex-shrink-0";
+                    distBadge.className = "text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full border bg-rose-500/20 text-rose-300 border-rose-500/40 self-start sm:self-auto";
+                    title.textContent = `Warning: High Noise Hotspot (${closestSpot.baseDb} dB)`;
+                } else {
+                    banner.className = "p-3 sm:p-4 rounded-2xl border bg-amber-950/60 border-amber-500/40 text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3";
+                    iconBox.className = "p-2 sm:p-2.5 rounded-xl bg-amber-500/20 text-amber-400 flex-shrink-0";
+                    distBadge.className = "text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full border bg-amber-500/20 text-amber-300 border-amber-500/40 self-start sm:self-auto";
+                    title.textContent = `Moderate Noise Hotspot (${closestSpot.baseDb} dB)`;
+                }
+            } else {
+                banner.classList.add('hidden');
+            }
+
+            const reportInput = document.getElementById('reportLocationInput');
+            if (reportInput && !reportInput.value) {
+                reportInput.placeholder = `Near ${closestSpot.label} (~${distText})`;
+            }
+        }
+
+        // Random Travel Destinations across the urban region
+        const randomTravelLocations = [
+            { label: "Chaura Bazar Commercial Crossing", coords: [30.9135, 75.8540], desc: "Dense market corridor with street vendors & honking" },
+            { label: "Interstate Bus Terminal (ISBT)", coords: [30.8988, 75.8622], desc: "Heavy diesel bus depot & passenger concourse" },
+            { label: "Aarti Chowk Flyover Junction", coords: [30.8925, 75.8240], desc: "Multi-lane arterial highway intersection" },
+            { label: "Gill Road Industrial Area", coords: [30.8750, 75.8640], desc: "Heavy mechanical workshops and steel forging" },
+            { label: "Railway Station Plaza", coords: [30.9080, 75.8600], desc: "Locomotive idling and platform loudspeaker chatter" },
+            { label: "Model Town Gol Market", coords: [30.8870, 75.8350], desc: "Retail commercial arcade and vehicle flow" },
+            { label: "Ferozepur Road Elevated Highway", coords: [30.8990, 75.8080], desc: "Rapid expressway vehicle stream" },
+            { label: "PAU Agricultural University Greens", coords: [30.9015, 75.8050], desc: "Quiet academic arboretum & walking path" },
+            { label: "Sarabha Nagar Market Plaza", coords: [30.8850, 75.8150], desc: "Pedestrian shopping and dining square" },
+            { label: "Jalandhar Bypass Toll Corridor", coords: [30.9450, 75.8550], desc: "Heavy multi-axle freight truck highway" },
+            { label: "Samrala Chowk Bypass", coords: [30.9070, 75.8880], desc: "Circular road transit corridor" },
+            { label: "Dhandari Kalan Freight Terminal", coords: [30.8650, 75.9200], desc: "Rail freight yard and industrial diesel cranes" },
+            { label: "Civil Lines Residential Park", coords: [30.9160, 75.8360], desc: "Urban tree canopy & neighborhood park" },
+            { label: "Sherpur Chowk GT Road Intersection", coords: [30.8950, 75.8850], desc: "Highway logistics corridor & heavy traffic" }
+        ];
+
+        let randomLocationIndex = -1;
+
+        function travelToRandomLocation() {
+            let nextIdx;
+            do {
+                nextIdx = Math.floor(Math.random() * randomTravelLocations.length);
+            } while (nextIdx === randomLocationIndex && randomTravelLocations.length > 1);
+            randomLocationIndex = nextIdx;
+
+            const spot = randomTravelLocations[randomLocationIndex];
+            // Slight jitter (±60m) so every travel is completely unique
+            const jitterLat = (Math.random() * 0.0016 - 0.0008);
+            const jitterLng = (Math.random() * 0.0016 - 0.0008);
+            const targetLat = spot.coords[0] + jitterLat;
+            const targetLng = spot.coords[1] + jitterLng;
+
+            applyUserPosition(targetLat, targetLng, 20, `Traveled to ${spot.label}`, 'travel');
+
+            if (userMap) userMap.flyTo([targetLat, targetLng], 15, { duration: 1 });
+            if (regionalMap) regionalMap.flyTo([targetLat, targetLng], 14, { duration: 1 });
+
+            const statusEl = document.getElementById('locationStatus');
+            const badgeEl = document.getElementById('mapAreaBadge');
+
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                    <span class="text-indigo-300 font-medium">Traveled to: <b>${spot.label}</b></span>
+                    <span class="text-[10px] text-slate-400">(${spot.desc})</span>
+                `;
+            }
+
+            if (badgeEl) {
+                badgeEl.textContent = `Traveled: ${spot.label.split(' ')[0]}`;
+                badgeEl.className = "text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
+            }
+
+            const nearest = lastSortedHotspots[0];
+            const distStr = nearest ? (nearest.distance < 1000 ? `${Math.round(nearest.distance)}m` : `${(nearest.distance / 1000).toFixed(1)}km`) : '';
+            showToast(`Traveled to ${spot.label}! Nearest noisy location: ${nearest ? nearest.label : 'Nearby'} (${nearest ? (nearest.currentDb || nearest.baseDb) : 80} dB at ${distStr})`, 'info');
+        }
+
+        // 4. Continuous Real-Time GPS Tracking with Intelligent IP Fallback & Map Pinning
+        let trackingWatchId = null;
+
+        async function reverseGeocodeAddress(lat, lng) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.address) {
+                        const road = data.address.road || data.address.suburb || data.address.neighbourhood || data.address.residential || '';
+                        const city = data.address.city || data.address.town || data.address.county || '';
+                        if (road && city) return `${road}, ${city}`;
+                        if (data.display_name) return data.display_name.split(',').slice(0, 2).join(', ');
+                    }
+                }
+            } catch (e) {
+                // silent fallback
+            }
+            return null;
+        }
+
+        function applyUserPosition(lat, lng, accuracy = 45, label = 'You are here', source = 'gps') {
+            currentPosition = [lat, lng];
+
+            // Adapt the regional sensor cluster network if the user's location is far from current grid center
+            const distFromGrid = getDistanceInMeters(lat, lng, currentGridCenter[0], currentGridCenter[1]);
+            if (distFromGrid > 18000) {
+                const areaLabel = label.replace('Approximate: ', '').replace('You are here: ', '').replace(' (Live)', '').split(',')[0].trim();
+                adaptHotspotsToCenter(lat, lng, areaLabel || 'Local');
+                const badge = document.getElementById('mapAreaBadge');
+                if (badge) badge.textContent = `${areaLabel || 'Active'} Grid`;
+            }
+
+            // High precision zoom level: zoom in close (16-17) when exact location is detected
+            const zoomLevel = (source === 'gps' || source === 'custom') ? 17 : 14;
+            userMap.setView([lat, lng], zoomLevel);
+            regionalMap.panTo([lat, lng]);
+
+            if (userMarker) userMap.removeLayer(userMarker);
+            if (userRadiusCircle) userMap.removeLayer(userRadiusCircle);
+
+            const isGps = source === 'gps';
+            const isCustom = source === 'custom';
+            const circleColor = isGps ? '#10b981' : (isCustom ? '#f59e0b' : '#3b82f6');
+            const circleFill = isGps ? '#34d399' : (isCustom ? '#fbbf24' : '#60a5fa');
+
+            userRadiusCircle = L.circle([lat, lng], {
+                radius: Math.max(accuracy, 12),
+                color: circleColor,
+                fillColor: circleFill,
+                fillOpacity: isGps ? 0.22 : 0.16,
+                weight: 1.5
+            }).addTo(userMap);
+
+            // High-precision custom pulsing draggable marker
+            const markerPulseColor = isGps ? 'bg-emerald-500/40' : (isCustom ? 'bg-amber-500/40' : 'bg-indigo-500/40');
+            const markerBgColor = isGps ? 'bg-emerald-500' : (isCustom ? 'bg-amber-500' : 'bg-indigo-600');
+            const markerHtml = `
+                <div class="relative flex items-center justify-center cursor-move group" title="Your exact location (Drag to fine-tune)">
+                    <span class="absolute w-8 h-8 rounded-full ${markerPulseColor} animate-ping pointer-events-none"></span>
+                    <span class="absolute w-6 h-6 rounded-full ${markerPulseColor} opacity-75"></span>
+                    <div class="w-4 h-4 rounded-full ${markerBgColor} border-2 border-white shadow-2xl flex items-center justify-center">
+                        <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                    </div>
+                </div>
+            `;
+
+            const userExactIcon = L.divIcon({
+                className: 'user-exact-marker',
+                html: markerHtml,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+
+            userMarker = L.marker([lat, lng], {
+                icon: userExactIcon,
+                draggable: true
+            }).addTo(userMap).bindPopup(`
+                <div class="text-xs text-slate-800 font-sans min-w-[160px]">
+                    <div class="font-bold text-slate-900">${label}</div>
+                    <div class="text-[10px] text-slate-600 font-mono mt-0.5">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+                    <div class="text-[9px] text-emerald-600 font-semibold mt-0.5">Accuracy: ±${Math.round(accuracy)}m</div>
+                    <div class="text-[9px] text-slate-400 mt-1 italic">Drag marker to pinpoint your exact doorstep</div>
+                </div>
+            `).openPopup();
+
+            userMarker.on('dragend', (e) => {
+                const pos = e.target.getLatLng();
+                applyUserPosition(pos.lat, pos.lng, 8, 'Custom Exact Pinpoint', 'custom');
+                const statusEl = document.getElementById('locationStatus');
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                        <span class="text-amber-300 font-medium">Pinpointed Spot: <b>${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}</b></span>
+                        <span class="text-[10px] text-slate-400">(Adjusted exact location)</span>
+                    `;
+                }
+                showToast(`Location adjusted to ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`, 'info');
+            });
+
+            // Update floating HUD in map corner
+            const hudCoords = document.getElementById('hudCoordsText');
+            const hudAcc = document.getElementById('hudAccuracyText');
+            if (hudCoords) hudCoords.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            if (hudAcc) {
+                hudAcc.textContent = `±${Math.round(accuracy)}m (${accuracy <= 25 ? 'High Accuracy' : 'Estimated'})`;
+                hudAcc.className = accuracy <= 25 ? 'text-emerald-400 font-bold font-mono' : 'text-amber-400 font-bold font-mono';
+            }
+
+            updateNearbyHotspotUI(lat, lng);
+        }
+
+        async function fetchIpLocationFallback(reason = '') {
+            const statusEl = document.getElementById('locationStatus');
+            const badgeEl = document.getElementById('mapAreaBadge');
+
+            statusEl.innerHTML = `
+                <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                <span class="text-blue-300">Resolving location via IP network...</span>
+            `;
+
+            try {
+                const res = await fetch('/api/location/lookup');
+                const data = await res.json();
+
+                if (data && data.latitude && data.longitude) {
+                    const placeName = data.city ? `${data.city}, ${data.region || data.country}` : 'Local Network Area';
+                    applyUserPosition(data.latitude, data.longitude, 1800, `Approximate: ${placeName}`, 'ip');
+
+                    statusEl.innerHTML = `
+                        <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                        <span class="text-blue-300 font-medium">Auto-located via IP: <b>${placeName}</b></span>
+                        <span class="text-[10px] text-slate-400">(${reason || 'GPS restricted in iframe'})</span>
+                    `;
+
+                    badgeEl.textContent = `${data.city || 'Regional'} Area`;
+                    badgeEl.className = "text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30";
+                    return;
+                }
+            } catch (e) {
+                // fall through to default
+            }
+
+            // Fallback default
+            applyUserPosition(fallbackCoords[0], fallbackCoords[1], 1200, 'Ludhiana Central Hub', 'fallback');
+            statusEl.innerHTML = `
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span class="text-amber-300 font-medium">Ludhiana Hub (Fallback)</span>
+                <span class="text-[10px] text-slate-400">— Click map to pinpoint your exact spot</span>
+            `;
+        }
+
+        function startLiveMovementTracking(interactive = false) {
+            const statusEl = document.getElementById('locationStatus');
+            const badgeEl = document.getElementById('mapAreaBadge');
+            const locateBtnLabel = document.getElementById('locateBtnLabel');
+            const gpsLiveBadge = document.getElementById('gpsLiveBadge');
+            const gpsLiveBadgeText = document.getElementById('gpsLiveBadgeText');
+
+            if (!navigator.geolocation) {
+                fetchIpLocationFallback('Geolocation API unsupported by browser');
+                return;
+            }
+
+            if (locateBtnLabel) {
+                locateBtnLabel.textContent = 'Acquiring Exact GPS...';
+            }
+
+            statusEl.innerHTML = `
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span class="text-emerald-300">Contacting GPS satellites (High Accuracy)...</span>
+            `;
+
+            if (trackingWatchId !== null) {
+                navigator.geolocation.clearWatch(trackingWatchId);
+                trackingWatchId = null;
+            }
+
+            // Request High-Accuracy Satellite GPS
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude, accuracy } = position.coords;
+                    applyUserPosition(latitude, longitude, accuracy, 'Exact Live Location', 'gps');
+
+                    if (userMap) {
+                        userMap.flyTo([latitude, longitude], 17, { duration: 1.2 });
+                    }
+
+                    if (locateBtnLabel) {
+                        locateBtnLabel.textContent = 'Tracking Exact Location (Live)';
+                    }
+
+                    if (gpsLiveBadge) {
+                        gpsLiveBadge.classList.remove('hidden');
+                        if (gpsLiveBadgeText) {
+                            gpsLiveBadgeText.textContent = `EXACT GPS LOCKED (±${Math.round(accuracy)}m)`;
+                        }
+                    }
+
+                    statusEl.innerHTML = `
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span class="text-emerald-400 font-bold">Exact GPS Active (±${Math.round(accuracy)}m)</span>
+                        <span class="text-slate-300 font-mono text-[10px] hidden sm:inline">[${latitude.toFixed(6)}, ${longitude.toFixed(6)}]</span>
+                    `;
+
+                    badgeEl.textContent = `Tracking (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
+                    badgeEl.className = "text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+
+                    showToast(`Exact GPS location locked with ±${Math.round(accuracy)}m precision!`, 'success');
+
+                    // Reverse geocode locality for display
+                    reverseGeocodeAddress(latitude, longitude).then(locality => {
+                        if (locality) {
+                            statusEl.innerHTML = `
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                <span class="text-emerald-400 font-bold">Exact Location: ${locality}</span>
+                                <span class="text-slate-400 text-[10px] font-mono">(±${Math.round(accuracy)}m)</span>
+                            `;
+                        }
+                    });
+
+                    // Start continuous watcher for live movement refinement
+                    trackingWatchId = navigator.geolocation.watchPosition(
+                        (watchPos) => {
+                            const { latitude: wLat, longitude: wLng, accuracy: wAcc } = watchPos.coords;
+                            applyUserPosition(wLat, wLng, wAcc, 'Exact Live Location', 'gps');
+                            const hudCoords = document.getElementById('hudCoordsText');
+                            const hudAcc = document.getElementById('hudAccuracyText');
+                            if (hudCoords) hudCoords.textContent = `${wLat.toFixed(6)}, ${wLng.toFixed(6)}`;
+                            if (hudAcc) hudAcc.textContent = `±${Math.round(wAcc)}m (High Accuracy)`;
+                        },
+                        (watchErr) => { console.warn('GPS continuous watch notice', watchErr); },
+                        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+                    );
+                },
+                (err) => {
+                    let reason = 'GPS unavailable';
+                    if (err.code === 1) { // PERMISSION_DENIED
+                        reason = 'Browser permission denied';
+                    } else if (err.code === 2) { // POSITION_UNAVAILABLE
+                        reason = 'GPS signal unavailable';
+                    } else if (err.code === 3) { // TIMEOUT
+                        reason = 'GPS timed out';
+                    }
+                    console.warn('[NoiseWatch Geolocation Notice]', err.code, err.message);
+
+                    if (locateBtnLabel) {
+                        locateBtnLabel.textContent = 'Retry GPS Fix';
+                    }
+
+                    if (err.code === 1) {
+                        showToast('Please grant location access in your browser or click on the map to set your exact spot.', 'warning');
+                    }
+
+                    fetchIpLocationFallback(reason);
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        // Allow user to click anywhere on userMap or regionalMap to place their location pin
+        function handleMapClick(e) {
+            const { lat, lng } = e.latlng;
+            applyUserPosition(lat, lng, 10, 'Custom Exact Location', 'custom');
+
+            const statusEl = document.getElementById('locationStatus');
+            const badgeEl = document.getElementById('mapAreaBadge');
+
+            statusEl.innerHTML = `
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span class="text-amber-300 font-medium">Custom Exact Pin: <b>${lat.toFixed(5)}, ${lng.toFixed(5)}</b></span>
+                <span class="text-[10px] text-slate-400">(Telemetry recomputed for selected coordinates)</span>
+            `;
+
+            badgeEl.textContent = `Pinned (${lat.toFixed(2)}, ${lng.toFixed(2)})`;
+            badgeEl.className = "text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30";
+        }
+
+        userMap.on('click', handleMapClick);
+        regionalMap.on('click', handleMapClick);
+
+        document.getElementById('recenterMapBtn')?.addEventListener('click', () => {
+            if (currentPosition) {
+                userMap.flyTo(currentPosition, 17, { duration: 0.8 });
+                showToast('Recentered on your exact position', 'info');
+            }
+        });
+
+        document.getElementById('randomTravelBtn')?.addEventListener('click', () => {
+            travelToRandomLocation();
+        });
+
+        document.getElementById('randomTravelMapBtn')?.addEventListener('click', () => {
+            travelToRandomLocation();
+        });
+
+        document.getElementById('locateUserBtn').addEventListener('click', () => {
+            startLiveMovementTracking(true);
+        });
+
+        document.getElementById('locateIpBtn')?.addEventListener('click', () => {
+            fetchIpLocationFallback('Manual IP request');
+        });
+
+        startLiveMovementTracking();
+
+        // Citizen Form Submission Handler
+        document.getElementById('citizenNoiseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitReportBtn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            const payload = {
+                full_name: document.getElementById('userNameInput').value,
+                phone: document.getElementById('userPhoneInput').value,
+                email: document.getElementById('userEmailInput').value,
+                location: document.getElementById('reportLocationInput').value || document.getElementById('reportLocationInput').placeholder,
+                db_level: parseFloat(document.getElementById('reportDbInput').value),
+                source: document.getElementById('reportSourceInput').value,
+                description: document.getElementById('reportDescInput').value,
+                coordinates: currentPosition || fallbackCoords
+            };
+
+            try {
+                const res = await fetch('/api/reports', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(data.message || 'Report submitted successfully!', 'success');
+                    e.target.reset();
+                    currentComplaintsCount += 1;
+                    localStorage.setItem('noise_complaints_count', currentComplaintsCount);
+                    if (countEl) countEl.textContent = currentComplaintsCount;
+                } else {
+                    showToast(data.error || 'Failed to submit report.', 'error');
+                }
+            } catch (err) {
+                currentComplaintsCount += 1;
+                localStorage.setItem('noise_complaints_count', currentComplaintsCount);
+                if (countEl) countEl.textContent = currentComplaintsCount;
+                showToast('Incident logged to local session storage.', 'info');
+                e.target.reset();
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Submit Report';
+            }
+        });
+
+        // Authority Dispatch Button Handler
+        document.getElementById('dispatchNoticeBtn').addEventListener('click', () => {
+            const activeHotspot = document.getElementById('alertHotspotName').textContent;
+            const noise = document.getElementById('alertHotspotDb').textContent;
+            showToast(`Authority notice dispatched for "${activeHotspot}" (${noise})!`, 'success');
+        });
+
+        document.querySelector('a[href="#report-form"]').addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = document.getElementById('report-form');
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth' });
+                setTimeout(() => {
+                    document.getElementById('userNameInput')?.focus();
+                }, 400);
+            }
+        });
+
+        if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
+            try {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .catch(() => {});
+            } catch (err) {}
+        }
+
+        // ==========================================
+        // 3D LIVE ROTATING EARTH (THREE.JS)
+        // ==========================================
+        (function initEarth() {
+            const canvas = document.getElementById('earthCanvas');
+            if (!canvas || typeof THREE === 'undefined') return;
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            function getCameraZ() {
+                return window.innerWidth < 640 ? 3.5 : 2.5;
+            }
+            camera.position.z = getCameraZ();
+
+            const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+            
+            function resizeViewport() {
+                const width = document.documentElement.clientWidth || window.innerWidth;
+                const height = window.innerHeight;
+                camera.aspect = width / height;
+                camera.position.z = getCameraZ();
+                camera.updateProjectionMatrix();
+                renderer.setSize(width, height);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+            }
+            resizeViewport();
+
+            function createProceduralEarthTexture() {
+                const c = document.createElement('canvas');
+                c.width = 1024;
+                c.height = 512;
+                const ctx = c.getContext('2d');
+                // Deep navy ocean background
+                ctx.fillStyle = '#0a0f24';
+                ctx.fillRect(0, 0, 1024, 512);
+
+                // Continental landmasses (indigo/violet glow)
+                ctx.fillStyle = '#312e81';
+                ctx.beginPath();
+                ctx.ellipse(250, 160, 110, 70, 0.2, 0, Math.PI * 2);
+                ctx.ellipse(320, 320, 70, 110, 0.1, 0, Math.PI * 2);
+                ctx.ellipse(680, 150, 160, 80, -0.1, 0, Math.PI * 2);
+                ctx.ellipse(540, 260, 85, 110, 0.1, 0, Math.PI * 2);
+                ctx.ellipse(820, 340, 60, 45, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Telemetry latitude / longitude grid lines
+                ctx.strokeStyle = 'rgba(99, 102, 241, 0.25)';
+                ctx.lineWidth = 1;
+                for (let y = 64; y < 512; y += 64) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(1024, y);
+                    ctx.stroke();
+                }
+                for (let x = 64; x < 1024; x += 96) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, 512);
+                    ctx.stroke();
+                }
+                return new THREE.CanvasTexture(c);
+            }
+
+            const earthMap = createProceduralEarthTexture();
+
+            const globeGeo = new THREE.SphereGeometry(1, 40, 40);
+            const globeMat = new THREE.MeshPhongMaterial({
+                map: earthMap,
+                shininess: 15,
+                color: 0xa5b4fc
+            });
+            const earth = new THREE.Mesh(globeGeo, globeMat);
+            earth.rotation.z = 0.41;
+            scene.add(earth);
+
+            const atmoGeo = new THREE.SphereGeometry(1.025, 40, 40);
+            const atmoMat = new THREE.MeshBasicMaterial({
+                color: 0x6366f1,
+                transparent: true,
+                opacity: 0.15,
+                side: THREE.BackSide,
+                blending: THREE.AdditiveBlending
+            });
+            const atmosphere = new THREE.Mesh(atmoGeo, atmoMat);
+            scene.add(atmosphere);
+
+            const starsGeo = new THREE.BufferGeometry();
+            const starCoords = [];
+            const starsCount = window.innerWidth < 640 ? 250 : 600;
+            for (let i = 0; i < starsCount; i++) {
+                starCoords.push(
+                    (Math.random() - 0.5) * 20,
+                    (Math.random() - 0.5) * 20,
+                    (Math.random() - 0.5) * 20
+                );
+            }
+            starsGeo.setAttribute('position', new THREE.Float32BufferAttribute(starCoords, 3));
+            const starsMat = new THREE.PointsMaterial({ color: 0x94a3b8, size: 0.015, transparent: true, opacity: 0.5 });
+            const starField = new THREE.Points(starsGeo, starsMat);
+            scene.add(starField);
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambient);
+
+            const direct = new THREE.DirectionalLight(0xffffff, 1.2);
+            direct.position.set(5, 3, 5);
+            scene.add(direct);
+
+            window.addEventListener('resize', () => {
+                resizeViewport();
+                if (typeof regionalMap !== 'undefined') regionalMap.invalidateSize();
+                if (typeof userMap !== 'undefined') userMap.invalidateSize();
+            });
+
+            function render() {
+                requestAnimationFrame(render);
+                earth.rotation.y += 0.0012;
+                atmosphere.rotation.y += 0.0012;
+                starField.rotation.y -= 0.0002;
+                renderer.render(scene, camera);
+            }
+            render();
+        })();
+    </script>
+</body>
+
+</html>

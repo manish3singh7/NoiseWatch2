@@ -1,0 +1,8 @@
+{
+  "name": "NoiseWatch",
+  "description": "Noise Monitoring Platform for continuous GPS tracking, acoustic telemetry, and citizen reporting.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
