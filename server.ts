@@ -6,7 +6,6 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import * as ejs from 'ejs';
-import { buildDocumentationPdf } from './pdfGenerator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -98,7 +97,7 @@ export interface AboutContent {
 
 const defaultAboutContent: AboutContent = {
   paragraph:
-    'NoiseWatch is an urban acoustic intelligence and noise pollution monitoring platform developed by Manish Singh from Guru Nanak Dev Engineering College (GNDEC), Ludhiana. The project is designed to bridge the gap between citizens and municipal authorities by combining real-time IoT decibel telemetry, verified incident reporting, and proactive environmental protection.',
+    'NoiseWatch is an urban acoustic intelligence and noise pollution monitoring platform designed to measure, analyze, and mitigate excessive sound levels across residential, commercial, and industrial zones. Developed by Manish Singh and Ashish Jaiswal, NoiseWatch is an Environmental Studies project under Lovely Professional University (LPU). The platform bridges the gap between citizens and municipal authorities by combining real-time IoT decibel telemetry, verified incident reporting, dynamic spatial heatmaps, and proactive environmental protection to foster healthier, quieter, and more sustainable urban communities.',
   updatedAt: new Date().toISOString()
 };
 
@@ -232,38 +231,6 @@ function requireAdmin(req: Request, res: Response, next: NextFunction) {
 // Healthcheck endpoint for Railway and monitoring
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'healthy', uptime: process.uptime(), timestamp: new Date().toISOString() });
-});
-
-// Download Complete PDF Platform Documentation
-app.get(['/download-documentation', '/NoiseWatch-Complete-Platform-Documentation.pdf', '/api/docs/pdf'], async (_req: Request, res: Response) => {
-  try {
-    const pdfPath = path.join(rootDir, 'statics', 'NoiseWatch-Complete-Platform-Documentation.pdf');
-    if (!fs.existsSync(pdfPath)) {
-      await buildDocumentationPdf(pdfPath);
-    }
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="NoiseWatch-Complete-Platform-Documentation.pdf"');
-    res.sendFile(pdfPath);
-  } catch (err) {
-    console.error('Failed to generate/send documentation PDF:', err);
-    res.status(500).send('Error generating documentation PDF. Please try again shortly.');
-  }
-});
-
-// View PDF Documentation Inline in Browser Tab
-app.get('/documentation/pdf', async (_req: Request, res: Response) => {
-  try {
-    const pdfPath = path.join(rootDir, 'statics', 'NoiseWatch-Complete-Platform-Documentation.pdf');
-    if (!fs.existsSync(pdfPath)) {
-      await buildDocumentationPdf(pdfPath);
-    }
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'inline; filename="NoiseWatch-Complete-Platform-Documentation.pdf"');
-    res.sendFile(pdfPath);
-  } catch (err) {
-    console.error('Failed to view documentation PDF:', err);
-    res.status(500).send('Error viewing documentation PDF.');
-  }
 });
 
 // Citizen Dashboard
@@ -612,11 +579,4 @@ app.post('/api/reports', (req: Request, res: Response) => {
 // Start Server
 app.listen(PORT, HOST, () => {
   console.log(`NoiseWatch server running on http://${HOST}:${PORT}`);
-  // Ensure documentation PDF is pre-rendered for instant downloads
-  const pdfPath = path.join(rootDir, 'statics', 'NoiseWatch-Complete-Platform-Documentation.pdf');
-  if (!fs.existsSync(pdfPath)) {
-    buildDocumentationPdf(pdfPath)
-      .then(() => console.log('NoiseWatch documentation PDF generated and ready for instant download.'))
-      .catch((err) => console.error('Failed to pre-render PDF documentation:', err));
-  }
 });
