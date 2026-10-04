@@ -9,6 +9,8 @@ import * as ejs from 'ejs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Support running from both project root (tsx server.ts) and compiled dist directory (node dist/server.js)
+const rootDir = fs.existsSync(path.join(__dirname, 'templates')) ? __dirname : path.join(__dirname, '..');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -39,12 +41,12 @@ app.use(
 // View engine setup
 app.engine('html', ejs.renderFile);
 app.set('view engine', 'html');
-app.set('views', path.join(__dirname, 'templates'));
+app.set('views', path.join(rootDir, 'templates'));
 
 // Static assets
-app.use('/statics', express.static(path.join(__dirname, 'statics')));
-app.use('/static', express.static(path.join(__dirname, 'static')));
-app.use('/static', express.static(path.join(__dirname, 'statics')));
+app.use('/statics', express.static(path.join(rootDir, 'statics')));
+app.use('/static', express.static(path.join(rootDir, 'static')));
+app.use('/static', express.static(path.join(rootDir, 'statics')));
 
 // Admin security configuration - restricted to the owner
 const ADMIN_USERNAME = (process.env.ADMIN_USERNAME || 'admin').trim().toLowerCase();
@@ -99,7 +101,7 @@ const defaultAboutContent: AboutContent = {
   updatedAt: new Date().toISOString()
 };
 
-const ABOUT_DATA_FILE = path.join(__dirname, 'data', 'about.json');
+const ABOUT_DATA_FILE = path.join(rootDir, 'data', 'about.json');
 
 function loadAboutContent(): AboutContent {
   try {
